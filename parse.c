@@ -395,7 +395,7 @@ static void stmt(State *s, Scope *sc, TokListItem *t) {
 
 		/* find beginning of while loop body */
 		TokListItem *lcurl;
-		for (TokListItem *i = t;; i++) {
+		for (TokListItem *i = t;; i = i->next) {
 			if (i == NULL) {
 				mark_err(&start->tok);
 				set_err("Expected '{' after 'while' loop condition");
