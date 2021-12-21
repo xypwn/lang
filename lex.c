@@ -61,7 +61,7 @@ TokList lex(const char *s) {
 						.kind = TokIdent,
 						.Ident = {
 							.kind = IdentName,
-							.Name = sndup(start, i),
+							.Name = psndup(toks.p, start, i),
 						},
 					});
 			}

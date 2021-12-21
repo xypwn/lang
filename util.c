@@ -49,12 +49,51 @@ void set_err(const char *fmt, ...) {
 	va_end(va);
 }
 
+Pool *pool_new(size_t init_cap) {
+	Pool *p = malloc(sizeof(Pool) + init_cap);
+	p->len = 0;
+	p->cap = init_cap;
+	p->data = p + 1;
+	p->next = NULL;
+	return p;
+}
+
+void pool_term(Pool *p) {
+	for (Pool *i = p; i != NULL;) {
+		Pool *next = i->next;
+		free(i);
+		i = next;
+	}
+}
+
+void *pool_alloc(Pool *p, size_t bytes) {
+	for (Pool *i = p;; i = i->next) {
+		if (i->len + bytes < i->cap) {
+			void *ret = (uint8_t*)i->data + i->len;
+			i->len += bytes;
+			return ret;
+		}
+		if (!i->next) {
+			i->next = pool_new(bytes + i->cap * 2);
+			i->next->len = bytes;
+			return i->next->data;
+		}
+	}
+}
+
 char *sndup(const char *s, size_t n) {
 	char *ret = malloc(n+1);
 	if (ret) {
 		memcpy(ret, s, n);
 		ret[n] = 0;
 	}
+	return ret;
+}
+
+char *psndup(Pool *p, const char *s, size_t n) {
+	char *ret = pool_alloc(p, n+1);
+	memcpy(ret, s, n);
+	ret[n] = 0;
 	return ret;
 }
 

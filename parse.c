@@ -18,6 +18,7 @@ typedef struct Scope {
 } Scope;
 
 static void mark_err(const Tok *t);
+static size_t get_ident_addr(const Scope *sc, const char *name, const Tok *errpos);
 static IRParam tok_to_irparam(Scope *sc, Tok *t);
 static Scope make_scope(Scope *parent, size_t mem_addr, bool with_idents);
 static void term_scope(Scope *sc);
@@ -29,23 +30,29 @@ static void mark_err(const Tok *t) {
 	err_col = t->col;
 }
 
+static size_t get_ident_addr(const Scope *sc, const char *name, const Tok *errpos) {
+	size_t addr;
+	bool exists = false;
+	for (const Scope *i = sc; i != NULL; i = i->parent) {
+		if (!i->has_idents)
+			continue;
+		exists = map_get(&i->ident_addrs, name, &addr);
+		if (exists)
+			break;
+	}
+	if (!exists) {
+		mark_err(errpos);
+		set_err("Identifier '%s' not recognized in this scope", name);
+		return 0;
+	}
+	return addr;
+}
+
 static IRParam tok_to_irparam(Scope *sc, Tok *t) {
 	if (t->kind == TokIdent) {
 		size_t addr;
 		if (t->Ident.kind == IdentName) {
-			bool exists = false;
-			for (Scope *i = sc; i != NULL; i = i->parent) {
-				if (!i->has_idents)
-					continue;
-				exists = map_get(&i->ident_addrs, t->Ident.Name, &addr);
-				if (exists)
-					break;
-			}
-			if (!exists) {
-				mark_err(t);
-				set_err("Identifier '%s' not recognized in this scope", t->Ident.Name);
-				return (IRParam){0};
-			}
+			TRY_RET(addr = get_ident_addr(sc, t->Ident.Name, t), (IRParam){0});
 		} else if (t->Ident.kind == IdentAddr)
 			addr = t->Ident.Addr;
 		else
@@ -316,6 +323,7 @@ static void stmt(State *s, Scope *sc, TokListItem *t) {
 		char *name = t->tok.Ident.Name;
 		t = t->next;
 		if (t->tok.kind == TokDeclare) {
+			t = t->next;
 			size_t addr = sc->mem_addr++;
 			bool replaced = map_insert(&sc->ident_addrs, name, &addr);
 			if (replaced) {
@@ -323,7 +331,11 @@ static void stmt(State *s, Scope *sc, TokListItem *t) {
 				set_err("'%s' already declared in this scope", name);
 				return;
 			}
+			TRY(expr(s, sc, t, true, true, addr));
+		} else if (t->tok.kind == TokAssign) {
 			t = t->next;
+			size_t addr;
+			TRY(addr = get_ident_addr(sc, name, &start->tok));
 			TRY(expr(s, sc, t, true, true, addr));
 		}
 	}

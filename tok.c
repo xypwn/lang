@@ -38,40 +38,21 @@ const char *tok_str[TokKindEnumSize] = {
 	[TokWhile]   = "while",
 };
 
-#define TOKLIST_MEMPOOL_INIT_CAP 4096
+#define TOKLIST_MEMPOOL_INIT_CAP 32768
 
 static inline TokListItem *toklist_alloc_item(TokList *l) {
-	if (l->curr_mempool_cap < l->mempool_sizes[l->curr_mempool]+1) {
-		if (l->curr_mempool+1 >= 32)
-			ASSERT_UNREACHED();
-		l->curr_mempool++;
-		l->curr_mempool_cap *= 2;
-		l->mempool_sizes[l->curr_mempool] = 0;
-		l->mempools[l->curr_mempool] = malloc(sizeof(TokListItem) * l->curr_mempool_cap);
-	}
-	TokListItem *itm = l->mempools[l->curr_mempool] + l->mempool_sizes[l->curr_mempool]++;
+	TokListItem *itm = pool_alloc(l->p, sizeof(TokListItem));
 	itm->prev = itm->next = NULL;
 	return itm;
 }
 
 void toklist_init(TokList *l) {
 	l->begin = l->end = NULL;
-	l->curr_mempool = 0;
-	l->mempools[l->curr_mempool] = malloc(sizeof(TokListItem) * TOKLIST_MEMPOOL_INIT_CAP);
-	l->curr_mempool_cap = TOKLIST_MEMPOOL_INIT_CAP;
-	l->mempool_sizes[0] = 0;
+	l->p = pool_new(TOKLIST_MEMPOOL_INIT_CAP);
 }
 
 void toklist_term(TokList *l) {
-	for (size_t i = 0; i <= l->curr_mempool; i++) {
-		for (size_t j = 0; j < l->mempool_sizes[i]; j++) {
-			TokListItem *itm = &l->mempools[i][j];
-			if (itm->tok.kind == TokIdent && itm->tok.Ident.kind == IdentName) {
-				free(itm->tok.Ident.Name);
-			}
-		}
-		free(l->mempools[i]);
-	}
+	pool_term(l->p);
 }
 
 void toklist_append(TokList *l, Tok t) {

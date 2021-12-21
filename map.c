@@ -85,7 +85,7 @@ bool map_insert(Map *m, const char *key, const void *val) {
 	return replaced;
 }
 
-bool map_get(Map *m, const char *key, void *out_val) {
+bool map_get(const Map *m, const char *key, void *out_val) {
 	size_t idx = fnv1a32(key, strlen(key)) & (m->cap - 1);
 	for (;;) {
 		if (m->slots[idx].empty)

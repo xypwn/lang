@@ -26,6 +26,6 @@ void map_term(Map *m);
 bool map_insert(Map *m, const char *key, const void *val);
 /* Returns true if the key was found, returns false if it wasn't found.
  * out_val may be set to NULL. */
-bool map_get(Map *m, const char *key, void *out_val);
+bool map_get(const Map *m, const char *key, void *out_val);
 
 #endif /* MAP_H */

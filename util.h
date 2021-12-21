@@ -41,11 +41,23 @@ void set_err(const char *fmt, ...);
 #define IS_ALPHA(c) ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || c == '_')
 #define IS_ALNUM(c) (IS_ALPHA(c) || IS_NUM(c))
 
+/* Useful for efficiently allocating lots of data that can all be freed at once afterwards. */
+typedef struct Pool {
+	struct Pool *next;
+	void *data;
+	size_t len, cap;
+} Pool;
+Pool *pool_new(size_t init_cap); /* You usually want init_cap to be pretty high. */
+void pool_term(Pool *p);
+void *pool_alloc(Pool *p, size_t bytes);
+
 #define streq(a, b) (strcmp(a, b) == 0)
 /* check if a null-terminated string and a non-null-terminated string are equal */
 static inline bool streq_0_n(const char *a, const char *b, size_t bn) { return bn == strlen(a) ? strncmp(a, b, bn) == 0 : false; }
-/* a more trusting version of strndup; also for systems that don't have strndup */
+/* a more trusting version of strndup */
 char *sndup(const char *s, size_t n);
+/* sndup with memory pools */
+char *psndup(Pool *p, const char *s, size_t n);
 /* convert a non-null-terminated string to an intmax_t */
 intmax_t stoimax(const char *s, size_t n, size_t base, ssize_t *endpos /* -1 on success */);
 /* convert a non-null-terminated string to a double */

@@ -24,10 +24,16 @@ map_test: map_test.c util.c map.c
 run_map_test: map_test
 	valgrind ./map_test
 
+pool_test: pool_test.c util.c
+	$(CC) -o $@ $< $(CFLAGS) $(LDFLAGS)
+
+run_pool_test: pool_test
+	valgrind ./pool_test
+
 .PHONY: clean
 
 clean:
-	rm -f $(OBJ) $(EXE) deps.mk gmon.out map_test
+	rm -f $(OBJ) $(EXE) deps.mk gmon.out map_test pool_test
 
 ifneq ($(MAKECMDGOALS),clean)
 include deps.mk

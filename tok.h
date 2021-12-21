@@ -4,6 +4,8 @@
 #include <stdint.h>
 #include <unistd.h>
 
+#include "util.h"
+
 typedef struct Type {
 	enum {
 		TypeVoid = 0,
@@ -87,10 +89,7 @@ typedef struct TokListItem {
 
 typedef struct TokList {
 	TokListItem *begin, *end;
-	TokListItem *mempools[32]; /* few mallocs, no copying => much speed */
-	size_t mempool_sizes[32];
-	size_t curr_mempool_cap;
-	size_t curr_mempool;
+	Pool *p;
 } TokList;
 
 void toklist_init(TokList *l);
