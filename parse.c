@@ -17,12 +17,25 @@ typedef struct Scope {
 	Map ident_addrs;
 } Scope;
 
+typedef struct ExprMode {
+	bool ignore_newln;
+
+	enum {
+		ExprModeJustCollapse, /* should leave either a literal or an own address as result */
+		ExprModeStorageAddr,  /* should use the supplied storage address in any case; should leave no token behind */
+	} kind;
+
+	union {
+		size_t StorageAddr;
+	};
+} ExprMode;
+
 static void mark_err(const Tok *t);
 static size_t get_ident_addr(const Scope *sc, const char *name, const Tok *errpos);
 static IRParam tok_to_irparam(Scope *sc, Tok *t);
-static Scope make_scope(Scope *parent, size_t mem_addr, bool with_idents);
+static Scope make_scope(Scope *parent, bool with_idents);
 static void term_scope(Scope *sc);
-static void expr(State *s, Scope *parent_sc, TokListItem *t, bool toplevel, bool use_storage_addr, size_t storage_addr);
+static void expr(State *s, Scope *parent_sc, TokListItem *t, ExprMode mode);
 static void stmt(State *s, Scope *sc, TokListItem *t);
 
 static void mark_err(const Tok *t) {
@@ -71,8 +84,8 @@ static IRParam tok_to_irparam(Scope *sc, Tok *t) {
 }
 
 /* term_scope doesn't have to be called if with_idents is set to false. */
-static Scope make_scope(Scope *parent, size_t mem_addr, bool with_idents) {
-	Scope s = { .parent = parent, .mem_addr = mem_addr, .has_idents = with_idents };
+static Scope make_scope(Scope *parent, bool with_idents) {
+	Scope s = { .parent = parent, .mem_addr = parent ? parent->mem_addr : 0, .has_idents = with_idents };
 	if (with_idents)
 		map_init(&s.ident_addrs, sizeof(size_t));
 	return s;
@@ -83,9 +96,7 @@ static void term_scope(Scope *sc) {
 		map_term(&sc->ident_addrs);
 }
 
-/* If toplevel is set, newlines are seen as delimiters ending the expression.
- * If use_storage_addr is set, the result is guaranteed to be put into storage_addr. */
-static void expr(State *s, Scope *parent_sc, TokListItem *t, bool toplevel, bool use_storage_addr, size_t storage_addr) {
+static void expr(State *s, Scope *parent_sc, TokListItem *t, ExprMode mode) {
 	/* A simplified example of how the operator precedence parsing works:
 	 * ________________________________
 	 *  Where t points to (between l_op and r_op in each step)
@@ -123,12 +134,9 @@ static void expr(State *s, Scope *parent_sc, TokListItem *t, bool toplevel, bool
 	 */
 
 	TokListItem *start = t;
-	Scope *sc = parent_sc;
-	Scope expr_scope_obj;
-	if (toplevel) {
-		expr_scope_obj = make_scope(parent_sc, parent_sc->mem_addr, false);
-		sc = &expr_scope_obj;
-	}
+
+	/* Each expression and subexpression has its own scope. */
+	Scope sc = make_scope(parent_sc, false);
 
 	for (;;) {
 		/* Prepare to collapse negative factor. */
@@ -138,8 +146,8 @@ static void expr(State *s, Scope *parent_sc, TokListItem *t, bool toplevel, bool
 			negate = true;
 		}
 
-		/* Ignore newlines if the expression is not toplevel. */
-		if (!toplevel && t->next->tok.kind == TokOp && t->next->tok.Op == OpNewLn)
+		/* Ignore newlines if told to do so. */
+		if (mode.ignore_newln && t->next->tok.kind == TokOp && t->next->tok.Op == OpNewLn)
 			toklist_del(s->toks, t->next, t->next);
 
 		/* Collapse negative factor. */
@@ -161,14 +169,14 @@ static void expr(State *s, Scope *parent_sc, TokListItem *t, bool toplevel, bool
 			} else {
 				/* use the predefined storage address if it was requested and we're on the last operation */
 				size_t res_addr;
-				if (use_storage_addr && is_last_operation)
-					res_addr = storage_addr;
+				if (mode.kind == ExprModeStorageAddr && is_last_operation)
+					res_addr = mode.StorageAddr;
 				else
-					res_addr = sc->mem_addr++;
+					res_addr = sc.mem_addr++;
 
 				/* add IR instruction to negate the value */
 				IRParam v_irparam;
-				TRY(v_irparam = tok_to_irparam(sc, v));
+				TRY(v_irparam = tok_to_irparam(&sc, v));
 				irtoks_app(s->ir, (IRTok){
 					.ln = t->tok.ln,
 					.col = t->tok.col,
@@ -179,17 +187,18 @@ static void expr(State *s, Scope *parent_sc, TokListItem *t, bool toplevel, bool
 					},
 				});
 
-				/* leave new memory address as result */
-				t->tok.kind = TokIdent;
-				t->tok.Ident = (Identifier){
-					.kind = IdentAddr,
-					.Addr = res_addr,
-				};
-
-				if (use_storage_addr && is_last_operation)
-					/* Since the final result was written to the storage address,
-					 * we're done. */
+				if (mode.kind == ExprModeStorageAddr && is_last_operation)  {
+					/* done */
+					toklist_del(s->toks, t, t);
 					return;
+				} else {
+					/* leave new memory address as result */
+					t->tok.kind = TokIdent;
+					t->tok.Ident = (Identifier){
+						.kind = IdentAddr,
+						.Addr = res_addr,
+					};
+				}
 			}
 		}
 
@@ -226,18 +235,20 @@ static void expr(State *s, Scope *parent_sc, TokListItem *t, bool toplevel, bool
 				set_err("Expected literal or identifier");
 				return;
 			}
-			IRParam res;
-			TRY(res = tok_to_irparam(sc, &t->tok));
-			irtoks_app(s->ir, (IRTok){
-				.ln = t->tok.ln,
-				.col = t->tok.col,
-				.instr = IRSet,
-				.Unary = {
-					.addr = use_storage_addr ? storage_addr : sc->mem_addr++,
-					.val = res,
-				},
-			});
-			toklist_del(s->toks, t, t);
+			if (mode.kind == ExprModeStorageAddr) {
+				IRParam res;
+				TRY(res = tok_to_irparam(&sc, &t->tok));
+				irtoks_app(s->ir, (IRTok){
+					.ln = t->tok.ln,
+					.col = t->tok.col,
+					.instr = IRSet,
+					.Unary = {
+						.addr = mode.StorageAddr,
+						.val = res,
+					},
+				});
+				toklist_del(s->toks, t, t);
+			}
 			return;
 		}
 
@@ -284,15 +295,15 @@ static void expr(State *s, Scope *parent_sc, TokListItem *t, bool toplevel, bool
 				TRY(lhs->Val = eval_arith(instr, &lhs->Val, &rhs->Val));
 			} else {
 				IRParam lhs_irparam, rhs_irparam;
-				TRY(lhs_irparam = tok_to_irparam(sc, lhs));
-				TRY(rhs_irparam = tok_to_irparam(sc, rhs));
+				TRY(lhs_irparam = tok_to_irparam(&sc, lhs));
+				TRY(rhs_irparam = tok_to_irparam(&sc, rhs));
 
 				/* use the predefined storage address if it was requested and we're on the last operation */
 				size_t res_addr;
-				if (use_storage_addr && is_last_operation)
-					res_addr = storage_addr;
+				if (mode.kind == ExprModeStorageAddr && is_last_operation)
+					res_addr = mode.StorageAddr;
 				else
-					res_addr = sc->mem_addr++;
+					res_addr = sc.mem_addr++;
 
 				/* emit IR code to evaluate the non-constant expression */
 				irtoks_app(s->ir, (IRTok){
@@ -306,17 +317,18 @@ static void expr(State *s, Scope *parent_sc, TokListItem *t, bool toplevel, bool
 					},
 				});
 
-				/* leave new memory address as result */
-				lhs->kind = TokIdent;
-				lhs->Ident = (Identifier){
-					.kind = IdentAddr,
-					.Addr = res_addr,
-				};
-
-				if (use_storage_addr && is_last_operation)
-					/* Since the final result was written to the storage address,
-					 * we're done. */
-					return;
+				if (mode.kind == ExprModeStorageAddr && is_last_operation) {
+					/* done */
+					toklist_del(s->toks, t, t);
+					break;
+				} else {
+					/* leave new memory address as result */
+					lhs->kind = TokIdent;
+					lhs->Ident = (Identifier){
+						.kind = IdentAddr,
+						.Addr = res_addr,
+					};
+				}
 			}
 		}
 	}
@@ -336,15 +348,15 @@ static void stmt(State *s, Scope *sc, TokListItem *t) {
 				set_err("'%s' already declared in this scope", name);
 				return;
 			}
-			TRY(expr(s, sc, t, true, true, addr));
+			TRY(expr(s, sc, t, (ExprMode){ .kind = ExprModeStorageAddr, .ignore_newln = false, .StorageAddr = addr }));
 		} else if (t->tok.kind == TokAssign) {
 			t = t->next;
 			size_t addr;
 			TRY(addr = get_ident_addr(sc, name, &start->tok));
-			TRY(expr(s, sc, t, true, true, addr));
+			TRY(expr(s, sc, t, (ExprMode){ .kind = ExprModeStorageAddr, .ignore_newln = false, .StorageAddr = addr }));
 		}
 	} else if (t->tok.kind == TokOp && t->tok.Op == OpLCurl) {
-		Scope inner_sc = make_scope(sc, sc->mem_addr, true);
+		Scope inner_sc = make_scope(sc, true);
 		for (;;) {
 			if (t->next->tok.kind == TokOp) {
 				if (t->next->tok.Op == OpEOF) {
@@ -401,8 +413,9 @@ static void stmt(State *s, Scope *sc, TokListItem *t) {
 		/* finally we know where the jmp from the beginning has to jump to */
 		s->ir->toks[jmp_instr_iaddr].Jmp.iaddr = s->ir->len;
 
-		size_t addr = sc->mem_addr++;
-		TRY(expr(s, sc, t, true, true, addr));
+		TRY(expr(s, sc, t, (ExprMode){ .kind = ExprModeJustCollapse, .ignore_newln = false }));
+		IRParam condition;
+		TRY(condition = tok_to_irparam(sc, &t->tok));
 
 		irtoks_app(s->ir, (IRTok){
 			.ln = t->tok.ln,
@@ -410,10 +423,7 @@ static void stmt(State *s, Scope *sc, TokListItem *t) {
 			.instr = IRJnz,
 			.CJmp = {
 				.iaddr = jmp_instr_iaddr + 1,
-				.condition = {
-					.kind = IRParamAddr,
-					.Addr = addr,
-				},
+				.condition = condition,
 			},
 		});
 	}
@@ -424,7 +434,7 @@ IRToks parse(TokList *toks) {
 	IRToks ir;
 	irtoks_init(&ir);
 	State s = { .toks = toks, .ir = &ir };
-	Scope global_scope = make_scope(NULL, 0, true);
+	Scope global_scope = make_scope(NULL, true);
 	for (;;) {
 		if (toks->begin->tok.kind == TokOp && toks->begin->tok.Op == OpEOF)
 			break;

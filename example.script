@@ -2,7 +2,7 @@ x := 1
 y := 1
 
 i := 60
-while i {
+while i + 1 {
 	z := x + y
 	y = x
 	x = z
