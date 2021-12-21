@@ -32,7 +32,9 @@ extern char errbuf[ERRSZ];
 extern bool err;
 extern size_t err_ln, err_col;
 #define TRY(expr) {expr; if (err) return;}
+#define TRY_ELSE(expr, onerr) {expr; if (err) {onerr; return;}}
 #define TRY_RET(expr, ret) {expr; if (err) return (ret);}
+#define TRY_RET_ELSE(expr, ret, onerr) {expr; if (err) {onerr; return (ret);}}
 void set_err(const char *fmt, ...);
 
 #define ASSERT_UNREACHED() { fprintf(stderr, "Illegal code position reached in %s:%d\n", __FILE__, __LINE__); exit(1); }

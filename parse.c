@@ -371,7 +371,7 @@ IRToks parse(TokList *toks) {
 	for (;;) {
 		if (toks->begin->tok.kind == TokOp && toks->begin->tok.Op == OpEOF)
 			break;
-		TRY_RET(stmt(&s, &global_scope, toks->begin), ir);
+		TRY_RET_ELSE(stmt(&s, &global_scope, toks->begin), ir, term_scope(&global_scope));
 	}
 	term_scope(&global_scope);
 	return ir;
