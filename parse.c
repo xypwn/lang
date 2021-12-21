@@ -221,6 +221,11 @@ static void expr(State *s, Scope *parent_sc, TokListItem *t, bool toplevel, bool
 		 * NOTE: Sometimes, we don't reach this point because the function already
 		 * exits directly after the last operation. */
 		if (l_op_prec == PREC_DELIM && r_op_prec == PREC_DELIM) {
+			if (t->tok.kind != TokVal && t->tok.kind != TokIdent) {
+				mark_err(&t->tok);
+				set_err("Expected literal or identifier");
+				return;
+			}
 			IRParam res;
 			TRY(res = tok_to_irparam(sc, &t->tok));
 			irtoks_app(s->ir, (IRTok){
