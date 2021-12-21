@@ -15,7 +15,7 @@ Value eval_arith(IRInstr instr, const Value *lhs, const Value *rhs) {
 					case IRSub: res = lhs->Int - rhs->Int; break;
 					case IRMul: res = lhs->Int * rhs->Int; break;
 					case IRDiv: res = lhs->Int / rhs->Int; break;
-					default: break;
+					default: ASSERT_UNREACHED();
 				}
 				return (Value){
 					.type.kind = TypeInt,
@@ -28,7 +28,7 @@ Value eval_arith(IRInstr instr, const Value *lhs, const Value *rhs) {
 					case IRSub: res = lhs->Float - rhs->Float; break;
 					case IRMul: res = lhs->Float * rhs->Float; break;
 					case IRDiv: res = lhs->Float / rhs->Float; break;
-					default: break;
+					default: ASSERT_UNREACHED();
 				}
 				return (Value){
 					.type.kind = TypeFloat,

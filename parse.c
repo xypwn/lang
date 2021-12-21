@@ -343,6 +343,22 @@ static void stmt(State *s, Scope *sc, TokListItem *t) {
 			TRY(addr = get_ident_addr(sc, name, &start->tok));
 			TRY(expr(s, sc, t, true, true, addr));
 		}
+	} else if (t->tok.kind == TokOp && t->tok.Op == OpLCurl) {
+		Scope inner_sc = make_scope(sc, sc->mem_addr, true);
+		for (;;) {
+			if (t->next->tok.kind == TokOp) {
+				if (t->next->tok.Op == OpEOF) {
+					term_scope(&inner_sc);
+					mark_err(&start->tok);
+					set_err("Unclosed '{'");
+					return;
+				}
+				if (t->next->tok.Op == OpRCurl)
+					break;
+			}
+			TRY(stmt(s, &inner_sc, t->next));
+		}
+		term_scope(&inner_sc);
 	}
 	toklist_del(s->toks, start, t);
 }

@@ -11,6 +11,7 @@ const char *irinstr_str[IRInstrEnumSize] = {
 	[IRMul] = "mul",
 	[IRDiv] = "div",
 	[IRPrint] = "print",
+	[IRJmp] = "jmp",
 	[IRJnz] = "jnz",
 };
 
@@ -89,6 +90,10 @@ void print_ir(IRToks *v) {
 					printf(" ");
 					print_irparam(&a->param);
 				}
+				break;
+			case IRJmp:
+				printf(" ");
+				printf(" %zu", v->toks[i].Jmp.iaddr);
 				break;
 			case IRJnz:
 				printf(" ");

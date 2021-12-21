@@ -11,6 +11,7 @@ enum IRInstr {
 	IRMul,
 	IRDiv,
 	IRPrint,
+	IRJmp,
 	IRJnz,
 	IRInstrEnumSize,
 };
@@ -56,6 +57,10 @@ typedef struct IRTok {
 			IRArgs *args;
 			size_t args_size;
 		} Print;
+
+		struct {
+			size_t iaddr;
+		} Jmp;
 		
 		struct {
 			size_t iaddr;
