@@ -356,9 +356,66 @@ static void stmt(State *s, Scope *sc, TokListItem *t) {
 				if (t->next->tok.Op == OpRCurl)
 					break;
 			}
-			TRY(stmt(s, &inner_sc, t->next));
+			TRY_ELSE(stmt(s, &inner_sc, t->next), term_scope(&inner_sc));
 		}
 		term_scope(&inner_sc);
+		t = t->next;
+	} else if (t->tok.kind == TokWhile) {
+		/* How while is generally implemented in IR: 
+		 * 0: jmp to 3
+		 * 1: some_code
+		 * 2: some_code
+		 * 3: some stuff evaluating condition xyz
+		 * 4: jmp to 1 if condition xyz is met
+		 * */
+
+		size_t jmp_instr_iaddr = s->ir->len;
+		irtoks_app(s->ir, (IRTok){
+			.ln = t->tok.ln,
+			.col = t->tok.col,
+			.instr = IRJmp,
+			.Jmp = {
+				.iaddr = 0, /* unknown for now */
+			},
+		});
+
+		t = t->next;
+
+		/* find beginning of while loop body */
+		TokListItem *lcurl;
+		for (TokListItem *i = t;; i++) {
+			if (i == NULL) {
+				mark_err(&start->tok);
+				set_err("Expected '{' after 'while' loop condition");
+				return;
+			}
+			if (i->tok.kind == TokOp && i->tok.Op == OpLCurl) {
+				lcurl = i;
+				break;
+			}
+		}
+
+		/* write loop body to IR stream */
+		TRY(stmt(s, sc, lcurl));
+
+		/* finally we know where the jmp from the beginning has to jump to */
+		s->ir->toks[jmp_instr_iaddr].Jmp.iaddr = s->ir->len;
+
+		size_t addr = sc->mem_addr++;
+		TRY(expr(s, sc, t, true, true, addr));
+
+		irtoks_app(s->ir, (IRTok){
+			.ln = t->tok.ln,
+			.col = t->tok.col,
+			.instr = IRJnz,
+			.CJmp = {
+				.iaddr = jmp_instr_iaddr + 1,
+				.condition = {
+					.kind = IRParamAddr,
+					.Addr = addr,
+				},
+			},
+		});
 	}
 	toklist_del(s->toks, start, t);
 }

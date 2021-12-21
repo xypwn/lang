@@ -69,6 +69,7 @@ static void print_irparam(const IRParam *p) {
 
 void print_ir(IRToks *v) {
 	for (size_t i = 0; i < v->len; i++) {
+		printf("%04zx ", i);
 		printf("%s", irinstr_str[v->toks[i].instr]);
 		switch (v->toks[i].instr) {
 			case IRSet:
@@ -92,13 +93,12 @@ void print_ir(IRToks *v) {
 				}
 				break;
 			case IRJmp:
-				printf(" ");
-				printf(" %zu", v->toks[i].Jmp.iaddr);
+				printf(" %zx", v->toks[i].Jmp.iaddr);
 				break;
 			case IRJnz:
 				printf(" ");
 				print_irparam(&v->toks[i].CJmp.condition);
-				printf(" %zu", v->toks[i].CJmp.iaddr);
+				printf(" %zx", v->toks[i].CJmp.iaddr);
 				break;
 			default:
 				break;
