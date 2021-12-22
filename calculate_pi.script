@@ -1,0 +1,13 @@
+sum := 0.0
+k := 0
+
+iterations := 100
+
+while k - iterations {
+	// This is only so messy because I haven't implemented parentheses yet so I
+	// have to wrap everything into functions instead.
+	sum = sum + 1.0 / pow(16.0, float(k)) * float(4.0 / float(8.0 * float(k) + 1.0) - 2.0 / float(8.0 * float(k) + 4.0) - 1.0 / float(8.0 * float(k) + 5.0) - 1.0 / float(8.0 * float(k) + 6.0))
+	k = k + 1
+}
+
+print(sum)
