@@ -49,8 +49,28 @@ void set_err(const char *fmt, ...) {
 	va_end(va);
 }
 
+#define XMALLOC_ERR "Failed to allocate %zu bytes: Out of memory\n"
+
+void *xmalloc(size_t size) {
+	void *ret = malloc(size);
+	if (!ret) {
+		fprintf(stderr, XMALLOC_ERR, size);
+		abort();
+	}
+	return ret;
+}
+
+void *xrealloc(void *ptr, size_t size) {
+	void *ret = realloc(ptr, size);
+	if (!ret) {
+		fprintf(stderr, XMALLOC_ERR, size);
+		abort();
+	}
+	return ret;
+}
+
 Pool *pool_new(size_t init_cap) {
-	Pool *p = malloc(sizeof(Pool) + init_cap);
+	Pool *p = xmalloc(sizeof(Pool) + init_cap);
 	p->len = 0;
 	p->cap = init_cap;
 	p->data = p + 1;
@@ -82,7 +102,7 @@ void *pool_alloc(Pool *p, size_t bytes) {
 }
 
 char *sndup(const char *s, size_t n) {
-	char *ret = malloc(n+1);
+	char *ret = xmalloc(n+1);
 	if (ret) {
 		memcpy(ret, s, n);
 		ret[n] = 0;

@@ -21,7 +21,7 @@ const char *irinstr_str[IRInstrEnumSize] = {
 static void irtoks_init_with_cap(IRToks *v, size_t cap);
 
 static void irtoks_init_with_cap(IRToks *v, size_t cap) {
-	v->toks = malloc(sizeof(IRTok) * cap);
+	v->toks = xmalloc(sizeof(IRTok) * cap);
 	v->len = 0;
 	v->cap = cap;
 }
@@ -50,13 +50,13 @@ void irtoks_term(IRToks *v) {
 
 void irtoks_app(IRToks *v, IRTok t) {
 	if (v->len+1 > v->cap)
-		v->toks = realloc(v->toks, sizeof(IRTok) * (v->cap *= 2));
+		v->toks = xrealloc(v->toks, sizeof(IRTok) * (v->cap *= 2));
 	v->toks[v->len++] = t;
 }
 
 void irtoks_app_irtoks(IRToks *v, IRToks *other) {
 	if (v->len+other->len > v->cap)
-		v->toks = realloc(v->toks, sizeof(IRTok) * (other->len + (v->cap *= 2)));
+		v->toks = xrealloc(v->toks, sizeof(IRTok) * (other->len + (v->cap *= 2)));
 	for (size_t i = 0; i < other->len; i++)
 		v->toks[v->len++] = other->toks[i];
 }

@@ -37,11 +37,14 @@ extern size_t err_ln, err_col;
 #define TRY_RET_ELSE(expr, ret, onerr) {expr; if (err) {onerr; return (ret);}}
 void set_err(const char *fmt, ...);
 
-#define ASSERT_UNREACHED() { fprintf(stderr, "Illegal code position reached in %s:%d\n", __FILE__, __LINE__); exit(1); }
+#define ASSERT_UNREACHED() { fprintf(stderr, "Illegal code position reached in %s:%d\n", __FILE__, __LINE__); abort(); }
 
 #define IS_NUM(c)   (c >= '0' && c <= '9')
 #define IS_ALPHA(c) ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || c == '_')
 #define IS_ALNUM(c) (IS_ALPHA(c) || IS_NUM(c))
+
+void *xmalloc(size_t size);
+void *xrealloc(void *ptr, size_t size);
 
 /* Useful for efficiently allocating lots of data that can all be freed at once afterwards. */
 typedef struct Pool {

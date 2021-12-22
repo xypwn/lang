@@ -14,7 +14,7 @@ static void init_with_cap(Map *m, size_t val_size, size_t cap) {
 	m->len = 0;
 	m->cap = cap;
 	m->val_size = val_size;
-	void *data = malloc(sizeof(MapSlot) * cap + val_size * cap);
+	void *data = xmalloc(sizeof(MapSlot) * cap + val_size * cap);
 	m->slots = data;
 	m->vals = m->slots + cap;
 	for (size_t i = 0; i < cap; i++) {
