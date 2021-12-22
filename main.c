@@ -9,6 +9,7 @@
 #include "lex.h"
 #include "parse.h"
 #include "util.h"
+#include "vm.h"
 
 static void usage(const char *prgname);
 static void die(const char *fmt, ...);
@@ -155,6 +156,13 @@ int main(int argc, const char **argv) {
 	if (opt_emit_ir)
 		print_ir(&ir, funcs);
 	/* run the IR */
-	/* TODO... */
+	if (!opt_dry) {
+		run(&ir, funcs);
+		if (err) {
+			irtoks_term(&ir);
+			fprintf(stderr, C_IRED "Runtime error" C_RESET " in " C_CYAN "%s" C_RESET ":%zu:%zu: %s\n", filename, err_ln, err_col, errbuf);
+			return 1;
+		}
+	}
 	irtoks_term(&ir);
 }

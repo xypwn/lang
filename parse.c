@@ -260,12 +260,7 @@ static void expr(IRToks *out_ir, TokList *toks, Map *funcs, Scope *parent_sc, To
 			if (v->kind == TokVal) {
 				/* immediately negate value */
 				t->tok.kind = TokVal;
-				t->tok.Val.type.kind = v->Val.type.kind;
-				switch (v->Val.type.kind) {
-					case TypeInt:   t->tok.Val.Int   = -v->Val.Int;   break;
-					case TypeFloat: t->tok.Val.Float = -v->Val.Float; break;
-					default: ASSERT_UNREACHED();
-				}
+				t->tok.Val = eval_unary(IRNeg, &v->Val);
 			} else {
 				/* use the predefined storage address if it was requested and we're on the last operation */
 				size_t res_addr;
