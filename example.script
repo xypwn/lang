@@ -1,4 +1,4 @@
-x := 1
+/*x := 1
 y := 1
 
 i := 60
@@ -6,6 +6,12 @@ while i {
 	z := x + y
 	y = x
 	x = z
-	//print(z)
+	print(z)
 	i = i - 1
-}
+}*/
+
+f := 2.0
+
+a := int(pow(f, 2.0)) + 1
+
+print(a)

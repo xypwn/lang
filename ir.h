@@ -3,6 +3,14 @@
 
 #include "tok.h"
 
+typedef struct BuiltinFunc {
+	char *name;
+	bool side_effects : 1;
+	size_t n_args;
+	Value (*func)(Value *args);
+	size_t fid; /* function ID, assigned automatically */
+} BuiltinFunc;
+
 enum IRInstr {
 	IRSet,
 	IRNeg,
@@ -10,9 +18,9 @@ enum IRInstr {
 	IRSub,
 	IRMul,
 	IRDiv,
-	IRPrint,
 	IRJmp,
 	IRJnz,
+	IRCallInternal,
 	IRInstrEnumSize,
 };
 typedef enum IRInstr IRInstr;
@@ -66,6 +74,12 @@ typedef struct IRTok {
 			size_t iaddr;
 			IRParam condition;
 		} CJmp;
+
+		struct {
+			size_t ret_addr;
+			size_t fid;
+			IRParam *args;
+		} CallI;
 	};
 } IRTok;
 
@@ -80,6 +94,6 @@ void irtoks_term(IRToks *v);
 void irtoks_app(IRToks *v, IRTok t);
 void irtoks_app_irtoks(IRToks *v, IRToks *other);
 
-void print_ir(IRToks *v);
+void print_ir(IRToks *v, const BuiltinFunc *builtin_funcs);
 
 #endif /* IR_H */

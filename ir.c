@@ -10,9 +10,9 @@ const char *irinstr_str[IRInstrEnumSize] = {
 	[IRSub] = "sub",
 	[IRMul] = "mul",
 	[IRDiv] = "div",
-	[IRPrint] = "print",
 	[IRJmp] = "jmp",
 	[IRJnz] = "jnz",
+	[IRCallInternal] = "calli",
 };
 
 #define IRTOKS_INIT_CAP_LONG 4096
@@ -37,13 +37,8 @@ void irtoks_init_short(IRToks *v) {
 
 void irtoks_term(IRToks *v) {
 	for (size_t i = 0; i < v->len; i++) {
-		if (v->toks[i].instr == IRPrint) {
-			for (IRArgs *a = v->toks[i].Print.args; a != NULL;) {
-				IRArgs *next = a->next;
-				free(a);
-				a = next;
-			}
-		}
+		if (v->toks[i].instr == IRCallInternal)
+			free(v->toks[i].CallI.args);
 	}
 	free(v->toks);
 }
@@ -86,30 +81,24 @@ static void print_irparam(const IRParam *p) {
 	}
 }
 
-void print_ir(IRToks *v) {
+void print_ir(IRToks *v, const BuiltinFunc *builtin_funcs) {
 	for (size_t i = 0; i < v->len; i++) {
 		printf("%04zx ", i);
 		printf("%s", irinstr_str[v->toks[i].instr]);
 		switch (v->toks[i].instr) {
 			case IRSet:
 			case IRNeg:
-				printf(" %%%zu ", v->toks[i].Unary.addr);
+				printf(" %%%zx ", v->toks[i].Unary.addr);
 				print_irparam(&v->toks[i].Unary.val);
 				break;
 			case IRAdd:
 			case IRSub:
 			case IRDiv:
 			case IRMul:
-				printf(" %%%zu ", v->toks[i].Arith.addr);
+				printf(" %%%zx ", v->toks[i].Arith.addr);
 				print_irparam(&v->toks[i].Arith.lhs);
 				printf(" ");
 				print_irparam(&v->toks[i].Arith.rhs);
-				break;
-			case IRPrint:
-				for (IRArgs *a = v->toks[i].Print.args; a != NULL; a = a->next) {
-					printf(" ");
-					print_irparam(&a->param);
-				}
 				break;
 			case IRJmp:
 				printf(" %zx", v->toks[i].Jmp.iaddr);
@@ -119,8 +108,16 @@ void print_ir(IRToks *v) {
 				print_irparam(&v->toks[i].CJmp.condition);
 				printf(" %zx", v->toks[i].CJmp.iaddr);
 				break;
-			default:
+			case IRCallInternal: {
+				const BuiltinFunc *f = &builtin_funcs[v->toks[i].CallI.fid];
+				printf(" %s %%%zx", f->name, v->toks[i].CallI.ret_addr);
+				for (size_t j = 0; j < f->n_args; j++) {
+					printf(" ");
+					print_irparam(&v->toks[i].CallI.args[j]);
+				}
 				break;
+			}
+			default: ASSERT_UNREACHED(); break;
 		}
 		printf(" ; %zu:%zu", v->toks[i].ln, v->toks[i].col);
 		printf("\n");

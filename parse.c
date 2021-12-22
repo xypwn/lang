@@ -30,8 +30,8 @@ static size_t get_ident_addr(const Scope *sc, const char *name, const Tok *errpo
 static IRParam tok_to_irparam(Scope *sc, Tok *t);
 static Scope make_scope(Scope *parent, bool with_idents);
 static void term_scope(Scope *sc);
-static void expr(IRToks *out_ir, TokList *toks, Scope *parent_sc, TokListItem *t, ExprMode mode);
-static void stmt(IRToks *out_ir, TokList *toks, Scope *sc, TokListItem *t);
+static void expr(IRToks *out_ir, TokList *toks, Map *funcs, Scope *parent_sc, TokListItem *t, ExprMode mode);
+static void stmt(IRToks *out_ir, TokList *toks, Map *funcs, Scope *sc, TokListItem *t);
 
 static void mark_err(const Tok *t) {
 	err_ln = t->ln;
@@ -91,7 +91,7 @@ static void term_scope(Scope *sc) {
 		map_term(&sc->ident_addrs);
 }
 
-static void expr(IRToks *out_ir, TokList *toks, Scope *parent_sc, TokListItem *t, ExprMode mode) {
+static void expr(IRToks *out_ir, TokList *toks, Map *funcs, Scope *parent_sc, TokListItem *t, ExprMode mode) {
 	/* A simplified example of how the operator precedence parsing works:
 	 * ________________________________
 	 *  Where t points to (between l_op and r_op in each step)
@@ -144,6 +144,111 @@ static void expr(IRToks *out_ir, TokList *toks, Scope *parent_sc, TokListItem *t
 		/* Ignore newlines if told to do so. */
 		if (mode.ignore_newln && t->next->tok.kind == TokOp && t->next->tok.Op == OpNewLn)
 			toklist_del(toks, t->next, t->next);
+
+		/* Collapse function call. */
+		if (t->tok.kind == TokIdent && t->tok.Ident.kind == IdentName && t->next->tok.kind == TokOp && t->next->tok.Op == OpLParen) {
+			BuiltinFunc func;
+			bool exists = map_get(funcs, t->tok.Ident.Name, &func);
+			if (!exists) {
+				mark_err(&t->tok);
+				set_err("Unrecognized function: %s()", t->tok.Ident.Name);
+				return;
+			}
+			TokListItem *func_ident = t;
+			t = t->next->next;
+			toklist_del(toks, t->prev, t->prev);
+
+			size_t n_args = 0;
+			TokListItem *first_arg = t;
+			TokListItem *last_arg = NULL;
+			
+			bool eval_func_in_place = !func.side_effects;
+			for (;;) {
+				n_args++;
+				TRY(expr(out_ir, toks, funcs, &sc, t, (ExprMode){ .kind = ExprModeJustCollapse, .ignore_newln = true }));
+				if (t->tok.kind == TokIdent)
+					eval_func_in_place = false;
+				if (t->next->tok.kind == TokOp) {
+					if (t->next->tok.Op == OpComma) {
+						toklist_del(toks, t->next, t->next);
+						t = t->next;
+						continue;
+					} else if (t->next->tok.Op == OpRParen) {
+						toklist_del(toks, t->next, t->next);
+						last_arg = t;
+						break;
+					}
+				}
+				mark_err(&t->next->tok);
+				set_err("Expected ',' or ')' after function argument");
+				return;
+			}
+
+			if (func.n_args != n_args) {
+				mark_err(&func_ident->tok);
+				const char *plural = func.n_args == 1 ? "" : "s";
+				set_err("Function %s() takes %zu argument%s but got %zu", func.name, func.n_args, plural, n_args);
+				return;
+			}
+
+			if (eval_func_in_place) {
+				Value *args = xmalloc(sizeof(Value) * n_args);
+				TokListItem *itm = first_arg;
+				for (size_t i = 0;; i++) {
+					args[i] = itm->tok.Val;
+					if (itm == last_arg)
+						break;
+					itm = itm->next;
+				}
+				func_ident->tok = (Tok) {
+					.kind = TokVal,
+					.Val = func.func(args),
+				};
+				free(args);
+			} else {
+				bool is_last_operation = func_ident == start && last_arg->next->tok.kind == TokOp && op_prec[last_arg->next->tok.Op] == PREC_DELIM;
+
+				IRParam *args = xmalloc(sizeof(IRParam) * n_args);
+				TokListItem *itm = first_arg;
+				for (size_t i = 0;; i++) {
+					TRY_ELSE(args[i] = tok_to_irparam(&sc, &itm->tok), free(args));
+					if (itm == last_arg)
+						break;
+					itm = itm->next;
+				}
+
+				size_t res_addr;
+				if (mode.kind == ExprModeStorageAddr && is_last_operation)
+					res_addr = mode.StorageAddr;
+				else
+					res_addr = sc.mem_addr++;
+				irtoks_app(out_ir, (IRTok){
+					.ln =  func_ident->tok.ln,
+					.col = func_ident->tok.col,
+					.instr = IRCallInternal,
+					.CallI = {
+						.ret_addr = res_addr,
+						.fid = func.fid,
+						.args = args,
+					},
+				});
+				if (mode.kind == ExprModeStorageAddr && is_last_operation) {
+					toklist_del(toks, func_ident, func_ident);
+					break;
+				} else {
+					func_ident->tok = (Tok) {
+						.kind = TokIdent,
+						.Ident = {
+							.kind = IdentAddr,
+							.Addr = res_addr,
+						},
+					};
+				}
+			}
+
+			t = func_ident;
+			toklist_del(toks, first_arg, last_arg);
+		}
 
 		/* Collapse negative factor. */
 		if (negate) {
@@ -329,9 +434,9 @@ static void expr(IRToks *out_ir, TokList *toks, Scope *parent_sc, TokListItem *t
 	}
 }
 
-static void stmt(IRToks *out_ir, TokList *toks, Scope *sc, TokListItem *t) {
+static void stmt(IRToks *out_ir, TokList *toks, Map *funcs, Scope *sc, TokListItem *t) {
 	TokListItem *start = t;
-	if (t->tok.kind == TokIdent && t->tok.Ident.kind == IdentName) {
+	if (t->tok.kind == TokIdent && t->tok.Ident.kind == IdentName && (t->next->tok.kind == TokDeclare || t->next->tok.kind == TokAssign)) {
 		char *name = t->tok.Ident.Name;
 		t = t->next;
 		if (t->tok.kind == TokDeclare) {
@@ -343,13 +448,14 @@ static void stmt(IRToks *out_ir, TokList *toks, Scope *sc, TokListItem *t) {
 				set_err("'%s' already declared in this scope", name);
 				return;
 			}
-			TRY(expr(out_ir, toks, sc, t, (ExprMode){ .kind = ExprModeStorageAddr, .ignore_newln = false, .StorageAddr = addr }));
+			TRY(expr(out_ir, toks, funcs, sc, t, (ExprMode){ .kind = ExprModeStorageAddr, .ignore_newln = false, .StorageAddr = addr }));
 		} else if (t->tok.kind == TokAssign) {
 			t = t->next;
 			size_t addr;
 			TRY(addr = get_ident_addr(sc, name, &start->tok));
-			TRY(expr(out_ir, toks, sc, t, (ExprMode){ .kind = ExprModeStorageAddr, .ignore_newln = false, .StorageAddr = addr }));
-		}
+			TRY(expr(out_ir, toks, funcs, sc, t, (ExprMode){ .kind = ExprModeStorageAddr, .ignore_newln = false, .StorageAddr = addr }));
+		} else
+			ASSERT_UNREACHED();
 	} else if (t->tok.kind == TokOp && t->tok.Op == OpLCurl) {
 		Scope inner_sc = make_scope(sc, true);
 		for (;;) {
@@ -363,7 +469,7 @@ static void stmt(IRToks *out_ir, TokList *toks, Scope *sc, TokListItem *t) {
 				if (t->next->tok.Op == OpRCurl)
 					break;
 			}
-			TRY_ELSE(stmt(out_ir, toks, &inner_sc, t->next), term_scope(&inner_sc));
+			TRY_ELSE(stmt(out_ir, toks, funcs, &inner_sc, t->next), term_scope(&inner_sc));
 		}
 		term_scope(&inner_sc);
 		t = t->next;
@@ -392,7 +498,7 @@ static void stmt(IRToks *out_ir, TokList *toks, Scope *sc, TokListItem *t) {
 		/* parse condition */
 		IRToks cond_ir;
 		irtoks_init_short(&cond_ir);
-		TRY_ELSE(expr(&cond_ir, toks, sc, t, (ExprMode){ .kind = ExprModeJustCollapse, .ignore_newln = false }), irtoks_term(&cond_ir));
+		TRY_ELSE(expr(&cond_ir, toks, funcs, sc, t, (ExprMode){ .kind = ExprModeJustCollapse, .ignore_newln = true }), irtoks_term(&cond_ir));
 		IRParam cond_irparam;
 		TRY_ELSE(cond_irparam = tok_to_irparam(sc, &t->tok), irtoks_term(&cond_ir));
 		/* add conditional jump */
@@ -406,10 +512,8 @@ static void stmt(IRToks *out_ir, TokList *toks, Scope *sc, TokListItem *t) {
 			},
 		});
 
-		t = t->next;
-
 		/* parse loop body */
-		TRY_ELSE(stmt(out_ir, toks, sc, t), irtoks_term(&cond_ir));
+		TRY_ELSE(stmt(out_ir, toks, funcs, sc, t->next), irtoks_term(&cond_ir));
 
 		/* finally we know where the jmp from the beginning has to jump to */
 		out_ir->toks[jmp_instr_iaddr].Jmp.iaddr = out_ir->len;
@@ -417,19 +521,40 @@ static void stmt(IRToks *out_ir, TokList *toks, Scope *sc, TokListItem *t) {
 		/* append condition IR to program IR, then terminate condition IR stream */
 		irtoks_app_irtoks(out_ir, &cond_ir);
 		irtoks_term(&cond_ir);
+
+		t = t->next;
+	} else if (t->tok.kind == TokOp && t->tok.Op == OpNewLn) {
+	} else {
+		/* assume expression */
+		TRY(expr(out_ir, toks, funcs, sc, t, (ExprMode){ .kind = ExprModeJustCollapse, .ignore_newln = false }));
 	}
 	toklist_del(toks, start, t);
 }
 
-IRToks parse(TokList *toks) {
+IRToks parse(TokList *toks, BuiltinFunc *builtin_funcs, size_t n_builtin_funcs) {
+	Map funcs;
+	map_init(&funcs, sizeof(BuiltinFunc));
+	for (size_t i = 0; i < n_builtin_funcs; i++) {
+		builtin_funcs[i].fid = i;
+		bool replaced = map_insert(&funcs, builtin_funcs[i].name, &builtin_funcs[i]);
+		if (replaced) {
+			err_ln = 0; err_col = 0;
+			set_err("Builtin function %s() declared more than once", builtin_funcs[i].name);
+			map_term(&funcs);
+			return (IRToks){0};
+		}
+	}
+
 	IRToks ir;
 	irtoks_init_long(&ir);
 	Scope global_scope = make_scope(NULL, true);
 	for (;;) {
 		if (toks->begin->tok.kind == TokOp && toks->begin->tok.Op == OpEOF)
 			break;
-		TRY_RET_ELSE(stmt(&ir, toks, &global_scope, toks->begin), ir, term_scope(&global_scope));
+		TRY_RET_ELSE(stmt(&ir, toks, &funcs, &global_scope, toks->begin), ir,
+				{ term_scope(&global_scope); map_term(&funcs); });
 	}
 	term_scope(&global_scope);
+	map_term(&funcs);
 	return ir;
 }
