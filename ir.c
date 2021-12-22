@@ -19,6 +19,7 @@ const char *irinstr_str[IRInstrEnumSize] = {
 #define IRTOKS_INIT_CAP_SHORT 16
 
 static void irtoks_init_with_cap(IRToks *v, size_t cap);
+
 static void irtoks_init_with_cap(IRToks *v, size_t cap) {
 	v->toks = malloc(sizeof(IRTok) * cap);
 	v->len = 0;
