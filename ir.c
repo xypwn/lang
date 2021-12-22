@@ -15,12 +15,23 @@ const char *irinstr_str[IRInstrEnumSize] = {
 	[IRJnz] = "jnz",
 };
 
-#define IRTOKS_INIT_CAP 4096
+#define IRTOKS_INIT_CAP_LONG 4096
+#define IRTOKS_INIT_CAP_SHORT 16
 
-void irtoks_init(IRToks *v) {
-	v->toks = malloc(sizeof(IRTok) * IRTOKS_INIT_CAP);
+static void irtoks_init_with_cap(IRToks *v, size_t cap);
+static void irtoks_init_with_cap(IRToks *v, size_t cap) {
+	v->toks = malloc(sizeof(IRTok) * cap);
 	v->len = 0;
-	v->cap = IRTOKS_INIT_CAP;
+	v->cap = cap;
+}
+
+void irtoks_init_long(IRToks *v) {
+	irtoks_init_with_cap(v, IRTOKS_INIT_CAP_LONG);
+
+}
+
+void irtoks_init_short(IRToks *v) {
+	irtoks_init_with_cap(v, IRTOKS_INIT_CAP_SHORT);
 }
 
 void irtoks_term(IRToks *v) {
@@ -40,6 +51,13 @@ void irtoks_app(IRToks *v, IRTok t) {
 	if (v->len+1 > v->cap)
 		v->toks = realloc(v->toks, sizeof(IRTok) * (v->cap *= 2));
 	v->toks[v->len++] = t;
+}
+
+void irtoks_app_irtoks(IRToks *v, IRToks *other) {
+	if (v->len+other->len > v->cap)
+		v->toks = realloc(v->toks, sizeof(IRTok) * (other->len + (v->cap *= 2)));
+	for (size_t i = 0; i < other->len; i++)
+		v->toks[v->len++] = other->toks[i];
 }
 
 static void print_val(const Value *v);

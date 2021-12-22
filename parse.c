@@ -5,11 +5,6 @@
 #include "map.h"
 #include "runtime.h"
 
-typedef struct State {
-	TokList *toks;
-	IRToks *ir;
-} State;
-
 typedef struct Scope {
 	struct Scope *parent;
 	size_t mem_addr;
@@ -35,8 +30,8 @@ static size_t get_ident_addr(const Scope *sc, const char *name, const Tok *errpo
 static IRParam tok_to_irparam(Scope *sc, Tok *t);
 static Scope make_scope(Scope *parent, bool with_idents);
 static void term_scope(Scope *sc);
-static void expr(State *s, Scope *parent_sc, TokListItem *t, ExprMode mode);
-static void stmt(State *s, Scope *sc, TokListItem *t);
+static void expr(IRToks *out_ir, TokList *toks, Scope *parent_sc, TokListItem *t, ExprMode mode);
+static void stmt(IRToks *out_ir, TokList *toks, Scope *sc, TokListItem *t);
 
 static void mark_err(const Tok *t) {
 	err_ln = t->ln;
@@ -96,7 +91,7 @@ static void term_scope(Scope *sc) {
 		map_term(&sc->ident_addrs);
 }
 
-static void expr(State *s, Scope *parent_sc, TokListItem *t, ExprMode mode) {
+static void expr(IRToks *out_ir, TokList *toks, Scope *parent_sc, TokListItem *t, ExprMode mode) {
 	/* A simplified example of how the operator precedence parsing works:
 	 * ________________________________
 	 *  Where t points to (between l_op and r_op in each step)
@@ -148,14 +143,14 @@ static void expr(State *s, Scope *parent_sc, TokListItem *t, ExprMode mode) {
 
 		/* Ignore newlines if told to do so. */
 		if (mode.ignore_newln && t->next->tok.kind == TokOp && t->next->tok.Op == OpNewLn)
-			toklist_del(s->toks, t->next, t->next);
+			toklist_del(toks, t->next, t->next);
 
 		/* Collapse negative factor. */
 		if (negate) {
 			bool is_last_operation = t->prev == start && t->next->tok.kind == TokOp && op_prec[t->next->tok.Op] == PREC_DELIM;
 			Tok *v = &t->tok;
 			t = t->prev;
-			toklist_del(s->toks, t->next, t->next);
+			toklist_del(toks, t->next, t->next);
 
 			if (v->kind == TokVal) {
 				/* immediately negate value */
@@ -177,7 +172,7 @@ static void expr(State *s, Scope *parent_sc, TokListItem *t, ExprMode mode) {
 				/* add IR instruction to negate the value */
 				IRParam v_irparam;
 				TRY(v_irparam = tok_to_irparam(&sc, v));
-				irtoks_app(s->ir, (IRTok){
+				irtoks_app(out_ir, (IRTok){
 					.ln = t->tok.ln,
 					.col = t->tok.col,
 					.instr = IRNeg,
@@ -189,7 +184,7 @@ static void expr(State *s, Scope *parent_sc, TokListItem *t, ExprMode mode) {
 
 				if (mode.kind == ExprModeStorageAddr && is_last_operation)  {
 					/* done */
-					toklist_del(s->toks, t, t);
+					toklist_del(toks, t, t);
 					return;
 				} else {
 					/* leave new memory address as result */
@@ -238,7 +233,7 @@ static void expr(State *s, Scope *parent_sc, TokListItem *t, ExprMode mode) {
 			if (mode.kind == ExprModeStorageAddr) {
 				IRParam res;
 				TRY(res = tok_to_irparam(&sc, &t->tok));
-				irtoks_app(s->ir, (IRTok){
+				irtoks_app(out_ir, (IRTok){
 					.ln = t->tok.ln,
 					.col = t->tok.col,
 					.instr = IRSet,
@@ -247,7 +242,7 @@ static void expr(State *s, Scope *parent_sc, TokListItem *t, ExprMode mode) {
 						.val = res,
 					},
 				});
-				toklist_del(s->toks, t, t);
+				toklist_del(toks, t, t);
 			}
 			return;
 		}
@@ -276,7 +271,7 @@ static void expr(State *s, Scope *parent_sc, TokListItem *t, ExprMode mode) {
 			/* delete the tokens that fall away from collapsing the expression 
 			 * (NOTE: only their references are deleted here, that's important
 			 * because we're still using their values later on) */
-			toklist_del(s->toks, t->next, t->next->next);
+			toklist_del(toks, t->next, t->next->next);
 
 			IRInstr instr;
 			switch (l_op->Op) {
@@ -306,7 +301,7 @@ static void expr(State *s, Scope *parent_sc, TokListItem *t, ExprMode mode) {
 					res_addr = sc.mem_addr++;
 
 				/* emit IR code to evaluate the non-constant expression */
-				irtoks_app(s->ir, (IRTok){
+				irtoks_app(out_ir, (IRTok){
 					.ln = l_op->ln,
 					.col = l_op->col,
 					.instr = instr,
@@ -319,7 +314,7 @@ static void expr(State *s, Scope *parent_sc, TokListItem *t, ExprMode mode) {
 
 				if (mode.kind == ExprModeStorageAddr && is_last_operation) {
 					/* done */
-					toklist_del(s->toks, t, t);
+					toklist_del(toks, t, t);
 					break;
 				} else {
 					/* leave new memory address as result */
@@ -334,7 +329,7 @@ static void expr(State *s, Scope *parent_sc, TokListItem *t, ExprMode mode) {
 	}
 }
 
-static void stmt(State *s, Scope *sc, TokListItem *t) {
+static void stmt(IRToks *out_ir, TokList *toks, Scope *sc, TokListItem *t) {
 	TokListItem *start = t;
 	if (t->tok.kind == TokIdent && t->tok.Ident.kind == IdentName) {
 		char *name = t->tok.Ident.Name;
@@ -348,12 +343,12 @@ static void stmt(State *s, Scope *sc, TokListItem *t) {
 				set_err("'%s' already declared in this scope", name);
 				return;
 			}
-			TRY(expr(s, sc, t, (ExprMode){ .kind = ExprModeStorageAddr, .ignore_newln = false, .StorageAddr = addr }));
+			TRY(expr(out_ir, toks, sc, t, (ExprMode){ .kind = ExprModeStorageAddr, .ignore_newln = false, .StorageAddr = addr }));
 		} else if (t->tok.kind == TokAssign) {
 			t = t->next;
 			size_t addr;
 			TRY(addr = get_ident_addr(sc, name, &start->tok));
-			TRY(expr(s, sc, t, (ExprMode){ .kind = ExprModeStorageAddr, .ignore_newln = false, .StorageAddr = addr }));
+			TRY(expr(out_ir, toks, sc, t, (ExprMode){ .kind = ExprModeStorageAddr, .ignore_newln = false, .StorageAddr = addr }));
 		}
 	} else if (t->tok.kind == TokOp && t->tok.Op == OpLCurl) {
 		Scope inner_sc = make_scope(sc, true);
@@ -368,7 +363,7 @@ static void stmt(State *s, Scope *sc, TokListItem *t) {
 				if (t->next->tok.Op == OpRCurl)
 					break;
 			}
-			TRY_ELSE(stmt(s, &inner_sc, t->next), term_scope(&inner_sc));
+			TRY_ELSE(stmt(out_ir, toks, &inner_sc, t->next), term_scope(&inner_sc));
 		}
 		term_scope(&inner_sc);
 		t = t->next;
@@ -381,8 +376,9 @@ static void stmt(State *s, Scope *sc, TokListItem *t) {
 		 * 4: jmp to 1 if condition xyz is met
 		 * */
 
-		size_t jmp_instr_iaddr = s->ir->len;
-		irtoks_app(s->ir, (IRTok){
+		/* add initial jmp instruction */
+		size_t jmp_instr_iaddr = out_ir->len;
+		irtoks_app(out_ir, (IRTok){
 			.ln = t->tok.ln,
 			.col = t->tok.col,
 			.instr = IRJmp,
@@ -393,52 +389,46 @@ static void stmt(State *s, Scope *sc, TokListItem *t) {
 
 		t = t->next;
 
-		/* find beginning of while loop body */
-		TokListItem *lcurl;
-		for (TokListItem *i = t;; i = i->next) {
-			if (i == NULL) {
-				mark_err(&start->tok);
-				set_err("Expected '{' after 'while' loop condition");
-				return;
-			}
-			if (i->tok.kind == TokOp && i->tok.Op == OpLCurl) {
-				lcurl = i;
-				break;
-			}
-		}
-
-		/* write loop body to IR stream */
-		TRY(stmt(s, sc, lcurl));
-
-		/* finally we know where the jmp from the beginning has to jump to */
-		s->ir->toks[jmp_instr_iaddr].Jmp.iaddr = s->ir->len;
-
-		TRY(expr(s, sc, t, (ExprMode){ .kind = ExprModeJustCollapse, .ignore_newln = false }));
-		IRParam condition;
-		TRY(condition = tok_to_irparam(sc, &t->tok));
-
-		irtoks_app(s->ir, (IRTok){
+		/* parse condition */
+		IRToks cond_ir;
+		irtoks_init_short(&cond_ir);
+		TRY_ELSE(expr(&cond_ir, toks, sc, t, (ExprMode){ .kind = ExprModeJustCollapse, .ignore_newln = false }), irtoks_term(&cond_ir));
+		IRParam cond_irparam;
+		TRY_ELSE(cond_irparam = tok_to_irparam(sc, &t->tok), irtoks_term(&cond_ir));
+		/* add conditional jump */
+		irtoks_app(&cond_ir, (IRTok){
 			.ln = t->tok.ln,
 			.col = t->tok.col,
 			.instr = IRJnz,
 			.CJmp = {
 				.iaddr = jmp_instr_iaddr + 1,
-				.condition = condition,
+				.condition = cond_irparam,
 			},
 		});
+
+		t = t->next;
+
+		/* parse loop body */
+		TRY_ELSE(stmt(out_ir, toks, sc, t), irtoks_term(&cond_ir));
+
+		/* finally we know where the jmp from the beginning has to jump to */
+		out_ir->toks[jmp_instr_iaddr].Jmp.iaddr = out_ir->len;
+
+		/* append condition IR to program IR, then terminate condition IR stream */
+		irtoks_app_irtoks(out_ir, &cond_ir);
+		irtoks_term(&cond_ir);
 	}
-	toklist_del(s->toks, start, t);
+	toklist_del(toks, start, t);
 }
 
 IRToks parse(TokList *toks) {
 	IRToks ir;
-	irtoks_init(&ir);
-	State s = { .toks = toks, .ir = &ir };
+	irtoks_init_long(&ir);
 	Scope global_scope = make_scope(NULL, true);
 	for (;;) {
 		if (toks->begin->tok.kind == TokOp && toks->begin->tok.Op == OpEOF)
 			break;
-		TRY_RET_ELSE(stmt(&s, &global_scope, toks->begin), ir, term_scope(&global_scope));
+		TRY_RET_ELSE(stmt(&ir, toks, &global_scope, toks->begin), ir, term_scope(&global_scope));
 	}
 	term_scope(&global_scope);
 	return ir;

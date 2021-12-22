@@ -74,9 +74,11 @@ typedef struct IRToks {
 	IRTok *toks;
 } IRToks;
 
-void irtoks_init(IRToks *v);
+void irtoks_init_long(IRToks *v);
+void irtoks_init_short(IRToks *v);
 void irtoks_term(IRToks *v);
 void irtoks_app(IRToks *v, IRTok t);
+void irtoks_app_irtoks(IRToks *v, IRToks *other);
 
 void print_ir(IRToks *v);
 
