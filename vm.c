@@ -43,6 +43,10 @@ static Value *irparam_to_val(Stack *s, IRParam *v) {
 }
 
 void run(const IRToks *ir, const BuiltinFunc *builtin_funcs) {
+	/* so we don't have to call malloc on every function call */
+	size_t fn_args_cap = 16;
+	Value *fn_args = xmalloc(sizeof(Value) * fn_args_cap);
+
 	Stack s = stack_make();
 	for (size_t i = 0; i < ir->len;) {
 		IRTok *instr = &ir->toks[i];
@@ -52,17 +56,18 @@ void run(const IRToks *ir, const BuiltinFunc *builtin_funcs) {
 			case IRSet:
 			case IRNeg:
 				stack_fit(&s, instr->Unary.addr);
-				TRY(s.mem[instr->Unary.addr] = eval_unary(instr->instr, irparam_to_val(&s, &instr->Unary.val)));
+				TRY_ELSE(s.mem[instr->Unary.addr] = eval_unary(instr->instr, irparam_to_val(&s, &instr->Unary.val)),
+					{free(fn_args); stack_term(&s);});
 				break;
 			case IRAdd:
 			case IRSub:
 			case IRDiv:
 			case IRMul:
 				stack_fit(&s, instr->Arith.addr);
-				TRY(s.mem[instr->Arith.addr] = eval_arith(instr->instr,
+				TRY_ELSE(s.mem[instr->Arith.addr] = eval_arith(instr->instr,
 					irparam_to_val(&s, &instr->Arith.lhs),
-					irparam_to_val(&s, &instr->Arith.rhs)
-				));
+					irparam_to_val(&s, &instr->Arith.rhs)),
+					{free(fn_args); stack_term(&s);});
 				break;
 			case IRJmp:
 				i = instr->Jmp.iaddr;
@@ -75,14 +80,16 @@ void run(const IRToks *ir, const BuiltinFunc *builtin_funcs) {
 				break;
 			case IRCallInternal: {
 				const BuiltinFunc *f = &builtin_funcs[instr->CallI.fid];
-				Value *args = xmalloc(sizeof(Value) * f->n_args);
+				/* make sure enough space for our arguments is allocated */
+				if (f->n_args > fn_args_cap)
+					fn_args = xrealloc(fn_args, sizeof(Value) * (fn_args_cap = f->n_args));
+				/* copy arguments into buffer */
 				for (size_t i = 0; i < f->n_args; i++)
-					args[i] = *irparam_to_val(&s, &instr->CallI.args[i]);
+					fn_args[i] = *irparam_to_val(&s, &instr->CallI.args[i]);
 
 				stack_fit(&s, instr->CallI.ret_addr);
-				TRY_ELSE(s.mem[instr->CallI.ret_addr] = f->func(args), free(args));
-
-				free(args);
+				TRY_ELSE(s.mem[instr->CallI.ret_addr] = f->func(fn_args),
+					{free(fn_args); stack_term(&s);});
 				break;
 			}
 			default:
@@ -92,4 +99,5 @@ void run(const IRToks *ir, const BuiltinFunc *builtin_funcs) {
 		i++;
 	}
 	stack_term(&s);
+	free(fn_args);
 }
