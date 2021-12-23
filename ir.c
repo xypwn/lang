@@ -105,6 +105,7 @@ void print_ir(IRToks *v, const BuiltinFunc *builtin_funcs) {
 		switch (v->toks[i].instr) {
 			case IRSet:
 			case IRNeg:
+			case IRNot:
 				printf(" %%%zx ", v->toks[i].Unary.addr);
 				print_irparam(&v->toks[i].Unary.val);
 				break;
