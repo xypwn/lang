@@ -1,0 +1,87 @@
+width := 280
+height := 100
+
+iterations := 100
+xmin := -2.0
+xmax := 0.5
+ymin := -1.0
+ymax := 1.0
+
+// Some further coordinates:
+/*iterations := 1000
+xmin := -0.9072945999
+xmax := -0.8984310833
+ymin := 0.2304178999
+ymax := 0.2370858666*/
+
+/*iterations := 100
+xmin := -0.193596288
+xmax := -0.119260320
+ymin := 1.006960992
+ymax := 1.062687264*/
+
+/*iterations := 800
+xmin := -0.1675326254
+xmax := -0.1675148625
+ymin := 1.0413005672
+ymax := 1.0413138086*/
+
+/*iterations := 918
+xmin := -0.7506201104
+xmax := -0.7503409687
+ymin := 0.0170447020
+ymax := 0.0172540583*/
+
+/*iterations := 400
+xmin := -0.7548484315
+xmax := -0.7540548595
+ymin := 0.0530077004
+ymax := 0.0536039518*/
+
+y := 0
+while y < height {
+	c_im := (float(height - y) / float(height)) * (ymax - ymin) + ymin
+	x := 0
+	while x < width {
+		c_re := (float(x) / float(width)) * (xmax - xmin) + xmin
+
+		z_re := 0.0
+		z_im := 0.0
+
+		it := 0
+		loop := true
+		while it < iterations && loop {
+			/* z = z*z + c */
+			/* (a + bi)^2 = a^2 + 2abi - b^2 */
+			z_re_tmp := z_re * z_re - z_im * z_im + c_re
+			z_im = 2.0 * z_re * z_im + c_im
+			z_re = z_re_tmp
+
+			/* Break if the number shoots off to infinity. */
+			if z_re * z_re + z_im * z_im > 4.0 {
+				loop = false
+			}
+
+			it = it + 1
+		}
+
+		if it <= iterations / 5 {
+			put(' ')
+		} else if it <= iterations / 5 * 2 {
+			put('.')
+		} else if it <= iterations / 5 * 3 {
+			put(',')
+		} else if it <= iterations / 5 * 4 {
+			put('*')
+		} else if it < iterations {
+			put('+')
+		} else if it == iterations {
+			put('#')
+		}
+
+		x = x + 1
+	}
+	put('\n')
+
+	y = y + 1
+}
