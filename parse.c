@@ -242,29 +242,37 @@ static ExprRet expr(IRToks *out_ir, TokList *toks, Map *funcs, Scope *parent_sc,
 			bool eval_func_in_place = !func.side_effects;
 
 			size_t args_len = 0;
-			size_t args_cap = 16;
-			IRParam *args = xmalloc(sizeof(IRParam) * args_cap);
-			for (;;) {
-				if (args_len+1 > args_cap)
-					args = xrealloc(args, (args_cap *= 2));
-				IRParam a;
-				TRY_RET_ELSE(a = expr_into_irparam(out_ir, toks, funcs, &sc, t->next), (ExprRet){0}, free(args));
-				args[args_len++] = a;
-				if (a.kind != IRParamLiteral)
-					eval_func_in_place = false;
-				if (t->next->tok.kind == TokOp) {
-					if (t->next->tok.Op == OpComma) {
-						toklist_del(toks, t->next, t->next);
-						continue;
-					} else if (t->next->tok.Op == OpRParen) {
-						toklist_del(toks, t->next, t->next);
-						break;
+			IRParam *args = NULL;
+
+			if (t->next->tok.kind == TokOp && t->next->tok.Op == OpRParen) {
+				/* no args */
+				toklist_del(toks, t->next, t->next); /* delete right parenthesis */
+			} else {
+				/* go through the arguments, evaluate them and put them into the args array */
+				size_t args_cap = 16;
+				args = xmalloc(sizeof(IRParam) * args_cap);
+				for (;;) {
+					if (args_len+1 > args_cap)
+						args = xrealloc(args, (args_cap *= 2));
+					IRParam a;
+					TRY_RET_ELSE(a = expr_into_irparam(out_ir, toks, funcs, &sc, t->next), (ExprRet){0}, free(args));
+					args[args_len++] = a;
+					if (a.kind != IRParamLiteral)
+						eval_func_in_place = false;
+					if (t->next->tok.kind == TokOp) {
+						if (t->next->tok.Op == OpComma) {
+							toklist_del(toks, t->next, t->next); /* delete right parenthesis */
+							continue;
+						} else if (t->next->tok.Op == OpRParen) {
+							toklist_del(toks, t->next, t->next); /* delete right parenthesis */
+							break;
+						}
 					}
+					mark_err(&t->next->tok);
+					set_err("Expected ',' or ')' after function argument");
+					free(args);
+					return (ExprRet){0};
 				}
-				mark_err(&t->next->tok);
-				set_err("Expected ',' or ')' after function argument");
-				free(args);
-				return (ExprRet){0};
 			}
 
 			t = func_ident;
@@ -274,21 +282,24 @@ static ExprRet expr(IRToks *out_ir, TokList *toks, Map *funcs, Scope *parent_sc,
 				mark_err(&func_ident->tok);
 				const char *plural = func.n_args == 1 ? "" : "s";
 				set_err("Function %s() takes %zu argument%s but got %zu", func.name, func.n_args, plural, args_len);
-				free(args);
+				if (args)
+					free(args);
 				return (ExprRet){0};
 			}
 
 			if (eval_func_in_place) {
 				/* evaluate the function in place */
-				Value *arg_vals = xmalloc(sizeof(Value) * args_len);
+				Value *arg_vals = args_len ? xmalloc(sizeof(Value) * args_len) : NULL;
 				for (size_t i = 0; i < args_len; i++)
 					arg_vals[i] = args[i].Literal;
 				func_ident->tok = (Tok) {
 					.kind = TokVal,
 					.Val = func.func(arg_vals),
 				};
-				free(arg_vals);
-				free(args);
+				if (arg_vals)
+					free(arg_vals);
+				if (args)
+					free(args);
 			} else {
 				bool is_last_operation = t == start && t->next->tok.kind == TokOp && op_prec[t->next->tok.Op] == PREC_DELIM;
 

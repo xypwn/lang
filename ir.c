@@ -43,7 +43,7 @@ void irtoks_init_short(IRToks *v) {
 
 void irtoks_term(IRToks *v) {
 	for (size_t i = 0; i < v->len; i++) {
-		if (v->toks[i].instr == IRCallInternal)
+		if (v->toks[i].instr == IRCallInternal && v->toks[i].CallI.args)
 			free(v->toks[i].CallI.args);
 	}
 	free(v->toks);
