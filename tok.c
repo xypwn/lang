@@ -115,6 +115,9 @@ void print_toks(TokList *l) {
 					case TypeBool:
 						printf(": " C_ICYAN "%s" C_RESET, i->tok.Val.Bool ? "true" : "false");
 						break;
+					case TypeChar:
+						printf(": " C_ICYAN "'%c'" C_RESET, i->tok.Val.Char);
+						break;
 					default:
 						printf(" " C_ICYAN "(unknown type)" C_RESET);
 						break;

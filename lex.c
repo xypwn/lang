@@ -11,6 +11,7 @@ static void consume(Pos *p, char c);
 static void emit(TokList *toks, const Pos *p, Tok t);
 static void mark(Pos *p);
 static void mark_err(const Pos *p);
+static char get_esc_char(char c);
 
 static void consume(Pos *p, char c) {
 	if (c == '\n') {
@@ -34,6 +35,23 @@ static void mark(Pos *p) {
 static void mark_err(const Pos *p) {
 	err_ln  = p->m_ln;
 	err_col = p->m_col;
+}
+
+static char get_esc_char(char c) {
+	switch(c) {
+		case 'a':  return '\a';
+		case 'b':  return '\b';
+		case 'e':  return '\033';
+		case 'f':  return '\f';
+		case 'n':  return '\n';
+		case 'r':  return '\r';
+		case 't':  return '\t';
+		case 'v':  return '\v';
+		case '\\': return '\\';
+		case '\'': return '\'';
+		case '"':  return '\"';
+		default:   return 0;
+	}
 }
 
 TokList lex(const char *s) {
@@ -248,6 +266,25 @@ TokList lex(const char *s) {
 						});
 				}
 				continue;
+			case '\'': {
+				consume(&pos, *(s++));
+				char c = s[0];
+				if (c == '\\') {
+					consume(&pos, *(s++));
+					c = get_esc_char(s[0]);
+					if (!c) {
+						set_err("Unrecognized escape sequence: '\\%c'", c);
+						return toks;
+					}
+				}
+				consume(&pos, *(s++));
+				if (s[0] != '\'') {
+					set_err("Unclosed char literal");
+					return toks;
+				}
+				emit(&toks, &pos, (Tok){ .kind = TokVal, .Val = { .type = { .kind = TypeChar, }, .Char = c, }, });
+				break;
+			}
 			default:
 				set_err("Unrecognized character: '%c'", s[0]);
 				return toks;

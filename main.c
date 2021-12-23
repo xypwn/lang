@@ -33,15 +33,22 @@ static void die(const char *fmt, ...) {
 	exit(1);
 }
 
-static Value fn_print(Value *args) {
+static Value fn_put(Value *args) {
 	switch (args[0].type.kind) {
-		case TypeVoid:  printf("(void)\n");                              break;
-		case TypeFloat: printf("%f\n", args[0].Float);                   break;
-		case TypeInt:   printf("%zd\n", args[0].Int);                    break;
-		case TypeBool:  printf("%s\n", args[0].Bool ? "true" : "false"); break;
+		case TypeVoid:  printf("(void)");                              break;
+		case TypeFloat: printf("%f", args[0].Float);                   break;
+		case TypeInt:   printf("%zd", args[0].Int);                    break;
+		case TypeBool:  printf("%s", args[0].Bool ? "true" : "false"); break;
+		case TypeChar:  printf("%c", args[0].Char);                    break;
 		default:
 			ASSERT_UNREACHED();
 	}
+	return (Value){0};
+}
+
+static Value fn_print(Value *args) {
+	fn_put(args);
+	printf("\n");
 	return (Value){0};
 }
 
@@ -141,6 +148,7 @@ int main(int argc, const char **argv) {
 		print_toks(&tokens);
 	/* parse tokens into IR code */
 	BuiltinFunc funcs[] = {
+		{ .name = "put",   .side_effects = true,  .n_args = 1, .func = fn_put,   },
 		{ .name = "print", .side_effects = true,  .n_args = 1, .func = fn_print, },
 		{ .name = "int",   .side_effects = false, .n_args = 1, .func = fn_int,   },
 		{ .name = "float", .side_effects = false, .n_args = 1, .func = fn_float, },

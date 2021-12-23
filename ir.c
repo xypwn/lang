@@ -84,6 +84,9 @@ static void print_val(const Value *v) {
 		case TypeBool:
 			printf("%s", v->Bool ? "true" : "false");
 			break;
+		case TypeChar:
+			printf("'%c'", v->Char);
+			break;
 		default:
 			printf("(unknown type)");
 			break;

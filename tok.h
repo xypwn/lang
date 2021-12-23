@@ -12,6 +12,7 @@ typedef struct Type {
 		TypeFloat,
 		TypeInt,
 		TypeBool,
+		TypeChar,
 	} kind;
 
 	/*union {
@@ -25,6 +26,7 @@ typedef struct Value {
 		double Float;
 		ssize_t Int;
 		bool Bool;
+		char Char;
 	};
 } Value;
 
