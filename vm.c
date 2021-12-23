@@ -46,21 +46,23 @@ void run(const IRToks *ir, const BuiltinFunc *builtin_funcs) {
 	Stack s = stack_make();
 	for (size_t i = 0; i < ir->len;) {
 		IRTok *instr = &ir->toks[i];
+		err_ln = instr->ln;
+		err_col = instr->col;
 		switch (instr->instr) {
 			case IRSet:
 			case IRNeg:
 				stack_fit(&s, instr->Unary.addr);
-				s.mem[instr->Unary.addr] = eval_unary(instr->instr, irparam_to_val(&s, &instr->Unary.val));
+				TRY(s.mem[instr->Unary.addr] = eval_unary(instr->instr, irparam_to_val(&s, &instr->Unary.val)));
 				break;
 			case IRAdd:
 			case IRSub:
 			case IRDiv:
 			case IRMul:
 				stack_fit(&s, instr->Arith.addr);
-				s.mem[instr->Arith.addr] = eval_arith(instr->instr,
+				TRY(s.mem[instr->Arith.addr] = eval_arith(instr->instr,
 					irparam_to_val(&s, &instr->Arith.lhs),
 					irparam_to_val(&s, &instr->Arith.rhs)
-				);
+				));
 				break;
 			case IRJmp:
 				i = instr->Jmp.iaddr;
@@ -78,7 +80,7 @@ void run(const IRToks *ir, const BuiltinFunc *builtin_funcs) {
 					args[i] = *irparam_to_val(&s, &instr->CallI.args[i]);
 
 				stack_fit(&s, instr->CallI.ret_addr);
-				s.mem[instr->CallI.ret_addr] = f->func(args);
+				TRY_ELSE(s.mem[instr->CallI.ret_addr] = f->func(args), free(args));
 
 				free(args);
 				break;
