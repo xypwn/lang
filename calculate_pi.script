@@ -3,7 +3,7 @@ k := 0
 
 iterations := 100
 
-while k - iterations {
+while k < iterations {
 	k_f := float(k)
 	sum = sum + 1.0 / pow(16.0, k_f) *
 		(4.0 / (8.0 * k_f + 1.0) -

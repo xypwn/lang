@@ -46,12 +46,16 @@ static void set_irtok_dest_addr(IRTok *t, size_t addr) {
 	switch (t->instr) {
 		case IRSet:
 		case IRNeg:
+		case IRNot:
 			t->Unary.addr = addr;
 			break;
 		case IRAdd:
 		case IRSub:
 		case IRMul:
 		case IRDiv:
+		case IREq:
+		case IRLt:
+		case IRLe:
 			t->Binary.addr = addr;
 			break;
 		case IRCallInternal:
@@ -172,11 +176,19 @@ static ExprRet expr(IRToks *out_ir, TokList *toks, Map *funcs, Scope *parent_sc,
 	Scope sc = make_scope(parent_sc, false);
 
 	for (;;) {
-		/* Prepare to collapse negative factor. */
-		bool negate = false;
-		if (t->tok.kind == TokOp && t->tok.Op == OpSub) {
-			t = t->next;
-			negate = true;
+		/* Prepare to collapse unary operation. */
+		bool perform_unary = false;
+		IRInstr unary_op;
+		if (t->tok.kind == TokOp) {
+			if (t->tok.Op == OpSub) {
+				t = t->next;
+				perform_unary = true;
+				unary_op = IRNeg;
+			} else if (t->tok.Op == OpNot) {
+				t = t->next;
+				perform_unary = true;
+				unary_op = IRNot;
+			}
 		}
 
 		/* Delete newline if we're definitely expecting an operand. */
@@ -312,28 +324,28 @@ static ExprRet expr(IRToks *out_ir, TokList *toks, Map *funcs, Scope *parent_sc,
 			}
 		}
 
-		/* Collapse negative factor. */
-		if (negate) {
-			Tok *v = &t->tok; /* what we want to negate */
+		/* Collapse unary operation. */
+		if (perform_unary) {
+			Tok *v = &t->tok; /* what we want to perform the operation on */
 			t = t->prev; /* go back to the '-' sign */
 			toklist_del(toks, t->next, t->next); /* again, just removing the reference */
 
 			bool is_last_operation = t == start && t->next->tok.kind == TokOp && op_prec[t->next->tok.Op] == PREC_DELIM;
 
 			if (v->kind == TokVal) {
-				/* immediately negate value */
+				/* immediately perform operation */
 				t->tok.kind = TokVal;
-				t->tok.Val = eval_unary(IRNeg, &v->Val);
+				TRY_RET(t->tok.Val = eval_unary(unary_op, &v->Val), (ExprRet){0});
 			} else {
 				size_t res_addr = is_last_operation ? 0 : sc.mem_addr++;
 
-				/* Instruction to negate. */
+				/* unary IR instruction */
 				IRParam v_irparam;
 				TRY_RET(v_irparam = tok_to_irparam(&sc, v), (ExprRet){0});
 				IRTok ir = {
 					.ln = t->tok.ln,
 					.col = t->tok.col,
-					.instr = IRNeg,
+					.instr = unary_op,
 					.Unary = {
 						.addr = res_addr,
 						.val = v_irparam,
@@ -421,12 +433,19 @@ static ExprRet expr(IRToks *out_ir, TokList *toks, Map *funcs, Scope *parent_sc,
 			 * because we're still using their values later on) */
 			toklist_del(toks, t->next, t->next->next);
 
+			bool swap_operands = false;
+
 			IRInstr instr;
 			switch (l_op->Op) {
 				case OpAdd: instr = IRAdd; break;
 				case OpSub: instr = IRSub; break;
 				case OpMul: instr = IRMul; break;
 				case OpDiv: instr = IRDiv; break;
+				case OpEq:  instr = IREq;  break;
+				case OpLt:  instr = IRLt;  break;
+				case OpLe:  instr = IRLe;  break;
+				case OpGt:  instr = IRLt; swap_operands = true; break;
+				case OpGe:  instr = IRLe; swap_operands = true; break;
 				default:
 					mark_err(l_op);
 					set_err("Unknown operation: '%s'", op_str[l_op->Op]);
@@ -435,8 +454,10 @@ static ExprRet expr(IRToks *out_ir, TokList *toks, Map *funcs, Scope *parent_sc,
 
 			if (lhs->kind == TokVal && rhs->kind == TokVal) {
 				/* evaluate the constant expression immediately */
+				Value *lhs_val = swap_operands ? &rhs->Val : &lhs->Val;
+				Value *rhs_val = swap_operands ? &lhs->Val : &rhs->Val;
 				lhs->kind = TokVal;
-				TRY_RET(lhs->Val = eval_binary(instr, &lhs->Val, &rhs->Val), (ExprRet){0});
+				TRY_RET(lhs->Val = eval_binary(instr, lhs_val, rhs_val), (ExprRet){0});
 			} else {
 				bool is_last_operation = t == start && r_op_prec == PREC_DELIM;
 
@@ -452,8 +473,8 @@ static ExprRet expr(IRToks *out_ir, TokList *toks, Map *funcs, Scope *parent_sc,
 					.instr = instr,
 					.Binary = {
 						.addr = res_addr,
-						.lhs = lhs_irparam,
-						.rhs = rhs_irparam,
+						.lhs = swap_operands ? rhs_irparam : lhs_irparam,
+						.rhs = swap_operands ? lhs_irparam : rhs_irparam,
 					},
 				};
 				

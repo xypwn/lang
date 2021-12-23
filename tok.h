@@ -11,6 +11,7 @@ typedef struct Type {
 		TypeVoid = 0,
 		TypeFloat,
 		TypeInt,
+		TypeBool,
 	} kind;
 
 	/*union {
@@ -23,6 +24,7 @@ typedef struct Value {
 	union {
 		double Float;
 		ssize_t Int;
+		bool Bool;
 	};
 } Value;
 
@@ -36,7 +38,13 @@ enum Operator {
 	OpSub    = '-',
 	OpMul    = '*',
 	OpDiv    = '/',
+	OpNot    = '!',
 	OpBeginNonchars = 256,
+	OpEq,
+	OpLt,
+	OpGt,
+	OpLe,
+	OpGe,
 	OpNewLn,
 	OpEOF,
 	OperatorEnumSize,

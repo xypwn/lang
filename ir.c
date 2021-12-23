@@ -10,6 +10,10 @@ const char *irinstr_str[IRInstrEnumSize] = {
 	[IRSub] = "sub",
 	[IRMul] = "mul",
 	[IRDiv] = "div",
+	[IREq]  = "eq",
+	[IRLt]  = "lt",
+	[IRLe]  = "le",
+	[IRNot] = "not",
 	[IRJmp] = "jmp",
 	[IRJnz] = "jnz",
 	[IRCallInternal] = "calli",
@@ -77,6 +81,9 @@ static void print_val(const Value *v) {
 		case TypeInt:
 			printf("%zd", v->Int);
 			break;
+		case TypeBool:
+			printf("%s", v->Bool ? "true" : "false");
+			break;
 		default:
 			printf("(unknown type)");
 			break;
@@ -105,6 +112,9 @@ void print_ir(IRToks *v, const BuiltinFunc *builtin_funcs) {
 			case IRSub:
 			case IRDiv:
 			case IRMul:
+			case IREq:
+			case IRLt:
+			case IRLe:
 				printf(" %%%zx ", v->toks[i].Binary.addr);
 				print_irparam(&v->toks[i].Binary.lhs);
 				printf(" ");

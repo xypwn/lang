@@ -39,6 +39,32 @@ Value eval_binary(IRInstr instr, const Value *lhs, const Value *rhs) {
 				return (Value){0};
 			}
 		}
+		case IREq:
+		case IRLt:
+		case IRLe:
+			bool res;
+			if (lhs->type.kind == TypeInt && rhs->type.kind == TypeInt) {
+				switch (instr) {
+					case IREq: res = lhs->Int == rhs->Int; break;
+					case IRLt: res = lhs->Int <  rhs->Int; break;
+					case IRLe: res = lhs->Int <= rhs->Int; break;
+					default: ASSERT_UNREACHED();
+				};
+			} else if (lhs->type.kind == TypeFloat && rhs->type.kind == TypeFloat) {
+				switch (instr) {
+					case IREq: res = lhs->Float == rhs->Float; break;
+					case IRLt: res = lhs->Float <  rhs->Float; break;
+					case IRLe: res = lhs->Float <= rhs->Float; break;
+					default: ASSERT_UNREACHED();
+				};
+			} else {
+				set_err("Unsupported types for operation '%s'", irinstr_str[instr]);
+				return (Value){0};
+			}
+			return (Value){
+				.type.kind = TypeBool,
+				.Bool = res,
+			};
 		default:
 			ASSERT_UNREACHED();
 	}
@@ -55,7 +81,14 @@ Value eval_unary(IRInstr instr, const Value *v) {
 			else if (v->type.kind == TypeFloat)
 				return (Value){ .type.kind = TypeFloat, .Float = -v->Float };
 			else {
-				set_err("Unsupported types for operation '%s'", irinstr_str[instr]);
+				set_err("Unsupported type for operation '%s'", irinstr_str[instr]);
+				return (Value){0};
+			}
+		case IRNot:
+			if (v->type.kind == TypeBool) {
+				return (Value){ .type.kind = TypeBool, .Bool = !v->Bool };
+			} else {
+				set_err("Unsupported type for operation '%s'", irinstr_str[instr]);
 				return (Value){0};
 			}
 		default:
@@ -67,6 +100,7 @@ bool is_nonzero(const Value *v) {
 	switch (v->type.kind) {
 		case TypeInt:   return v->Int   != 0;
 		case TypeFloat: return v->Float != 0.0;
+		case TypeBool:  return v->Bool;
 		default: ASSERT_UNREACHED();
 	}
 }
@@ -75,8 +109,9 @@ Value zero_val(Type ty) {
 	Value ret;
 	ret.type = ty;
 	switch (ty.kind) {
-		case TypeInt:   ret.Int   = 0;   break;
-		case TypeFloat: ret.Float = 0.0; break;
+		case TypeInt:   ret.Int   = 0;     break;
+		case TypeFloat: ret.Float = 0.0;   break;
+		case TypeBool:  ret.Bool  = false; break;
 		default: ASSERT_UNREACHED();
 	}
 	return ret;

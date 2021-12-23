@@ -35,9 +35,10 @@ static void die(const char *fmt, ...) {
 
 static Value fn_print(Value *args) {
 	switch (args[0].type.kind) {
-		case TypeVoid:  printf("(void)\n");            break;
-		case TypeFloat: printf("%f\n", args[0].Float); break;
-		case TypeInt:   printf("%zd\n", args[0].Int);  break;
+		case TypeVoid:  printf("(void)\n");                              break;
+		case TypeFloat: printf("%f\n", args[0].Float);                   break;
+		case TypeInt:   printf("%zd\n", args[0].Int);                    break;
+		case TypeBool:  printf("%s\n", args[0].Bool ? "true" : "false"); break;
 		default:
 			ASSERT_UNREACHED();
 	}

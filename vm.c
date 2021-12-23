@@ -55,6 +55,7 @@ void run(const IRToks *ir, const BuiltinFunc *builtin_funcs) {
 		switch (instr->instr) {
 			case IRSet:
 			case IRNeg:
+			case IRNot:
 				stack_fit(&s, instr->Unary.addr);
 				TRY_ELSE(s.mem[instr->Unary.addr] = eval_unary(instr->instr, irparam_to_val(&s, &instr->Unary.val)),
 					{free(fn_args); stack_term(&s);});
@@ -63,6 +64,9 @@ void run(const IRToks *ir, const BuiltinFunc *builtin_funcs) {
 			case IRSub:
 			case IRDiv:
 			case IRMul:
+			case IREq:
+			case IRLt:
+			case IRLe:
 				stack_fit(&s, instr->Binary.addr);
 				TRY_ELSE(s.mem[instr->Binary.addr] = eval_binary(instr->instr,
 					irparam_to_val(&s, &instr->Binary.lhs),

@@ -11,10 +11,15 @@ int8_t op_prec[OperatorEnumSize] = {
 	[OpLCurl]  = PREC_DELIM,
 	[OpRParen] = PREC_DELIM,
 	[OpComma]  = PREC_DELIM,
-	[OpAdd]    = 0,
-	[OpSub]    = 0,
-	[OpMul]    = 1,
-	[OpDiv]    = 1,
+	[OpEq]     = 0,
+	[OpLt]     = 0,
+	[OpGt]     = 0,
+	[OpLe]     = 0,
+	[OpGe]     = 0,
+	[OpAdd]    = 1,
+	[OpSub]    = 1,
+	[OpMul]    = 2,
+	[OpDiv]    = 2,
 };
 
 const char *op_str[OperatorEnumSize] = {
@@ -27,8 +32,14 @@ const char *op_str[OperatorEnumSize] = {
 	[OpSub]    = "-",
 	[OpMul]    = "*",
 	[OpDiv]    = "/",
+	[OpNot]    = "!",
 	[OpNewLn]  = "\\n",
 	[OpEOF]    = "EOF",
+	[OpEq]     = "==",
+	[OpLt]     = "<",
+	[OpGt]     = ">",
+	[OpLe]     = "<=",
+	[OpGe]     = ">=",
 };
 
 const char *tok_str[TokKindEnumSize] = {
@@ -100,6 +111,9 @@ void print_toks(TokList *l) {
 						break;
 					case TypeInt:
 						printf(": " C_ICYAN "%zd" C_RESET, i->tok.Val.Int);
+						break;
+					case TypeBool:
+						printf(": " C_ICYAN "%s" C_RESET, i->tok.Val.Bool ? "true" : "false");
 						break;
 					default:
 						printf(" " C_ICYAN "(unknown type)" C_RESET);

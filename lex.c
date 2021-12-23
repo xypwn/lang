@@ -58,6 +58,10 @@ TokList lex(const char *s) {
 				emit(&toks, &pos, (Tok){ .kind = TokElse });
 			else if (streq_0_n("while", start, i))
 				emit(&toks, &pos, (Tok){ .kind = TokWhile });
+			else if (streq_0_n("true", start, i))
+				emit(&toks, &pos, (Tok){ .kind = TokVal, .Val = { .type = { .kind = TypeBool, }, .Bool = true, }, });
+			else if (streq_0_n("false", start, i))
+				emit(&toks, &pos, (Tok){ .kind = TokVal, .Val = { .type = { .kind = TypeBool, }, .Bool = false, }, });
 			else {
 				emit(&toks, &pos, (Tok){
 						.kind = TokIdent,
@@ -162,15 +166,39 @@ TokList lex(const char *s) {
 				break;
 			case ':':
 				consume(&pos, *(s++));
-				if (s[0] == '=') {
+				if (s[0] == '=')
 					emit(&toks, &pos, (Tok){ .kind = TokDeclare });
-				} else {
+				else {
 					set_err("Expected ':='");
 					return toks;
 				}
 				break;
 			case '=':
-				emit(&toks, &pos, (Tok){ .kind = TokAssign });
+				consume(&pos, *(s++));
+				if (s[0] == '=')
+					emit(&toks, &pos, (Tok){ .kind = TokOp, .Op = OpEq });
+				else {
+					emit(&toks, &pos, (Tok){ .kind = TokAssign });
+					continue;
+				}
+				break;
+			case '<':
+				consume(&pos, *(s++));
+				if (s[0] == '=')
+					emit(&toks, &pos, (Tok){ .kind = TokOp, .Op = OpLe });
+				else {
+					emit(&toks, &pos, (Tok){ .kind = TokOp, .Op = OpLt });
+					continue;
+				}
+				break;
+			case '>':
+				consume(&pos, *(s++));
+				if (s[0] == '=')
+					emit(&toks, &pos, (Tok){ .kind = TokOp, .Op = OpGe });
+				else {
+					emit(&toks, &pos, (Tok){ .kind = TokOp, .Op = OpGt });
+					continue;
+				}
 				break;
 			case '{':
 			case '}':
@@ -180,6 +208,7 @@ TokList lex(const char *s) {
 			case '+':
 			case '-':
 			case '*':
+			case '!':
 				emit(&toks, &pos, (Tok){
 						.kind = TokOp,
 						.Op = s[0],
