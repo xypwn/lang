@@ -177,6 +177,14 @@ static ExprRet expr(IRToks *out_ir, TokList *toks, Map *funcs, Scope *parent_sc,
 			negate = true;
 		}
 
+		/* Delete newline if we're definitely expecting an operand. */
+		if (t->tok.kind == TokOp && t->tok.Op == OpNewLn) {
+			if (t == start)
+				start = t->next;
+			t = t->next;
+			toklist_del(toks, t->prev, t->prev);
+		}
+
 		/* Collapse parentheses. */
 		if (t->tok.kind == TokOp && t->tok.Op == OpLParen) {
 			ExprRet r;
