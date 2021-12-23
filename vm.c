@@ -67,6 +67,8 @@ void run(const IRToks *ir, const BuiltinFunc *builtin_funcs) {
 			case IREq:
 			case IRLt:
 			case IRLe:
+			case IRAnd:
+			case IROr:
 				stack_fit(&s, instr->Binary.addr);
 				TRY_ELSE(s.mem[instr->Binary.addr] = eval_binary(instr->instr,
 					irparam_to_val(&s, &instr->Binary.lhs),

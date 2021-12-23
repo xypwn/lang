@@ -56,6 +56,8 @@ static void set_irtok_dest_addr(IRTok *t, size_t addr) {
 		case IREq:
 		case IRLt:
 		case IRLe:
+		case IRAnd:
+		case IROr:
 			t->Binary.addr = addr;
 			break;
 		case IRCallInternal:
@@ -446,6 +448,8 @@ static ExprRet expr(IRToks *out_ir, TokList *toks, Map *funcs, Scope *parent_sc,
 				case OpLe:  instr = IRLe;  break;
 				case OpGt:  instr = IRLt; swap_operands = true; break;
 				case OpGe:  instr = IRLe; swap_operands = true; break;
+				case OpAnd: instr = IRAnd; break;
+				case OpOr:  instr = IROr;  break;
 				default:
 					mark_err(l_op);
 					set_err("Unknown operation: '%s'", op_str[l_op->Op]);

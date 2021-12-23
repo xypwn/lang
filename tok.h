@@ -47,6 +47,8 @@ enum Operator {
 	OpGt,
 	OpLe,
 	OpGe,
+	OpAnd,
+	OpOr,
 	OpNewLn,
 	OpEOF,
 	OperatorEnumSize,

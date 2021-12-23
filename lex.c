@@ -218,6 +218,20 @@ TokList lex(const char *s) {
 					continue;
 				}
 				break;
+			case '&':
+				consume(&pos, *(s++));
+				if (s[0] == '&') {
+					emit(&toks, &pos, (Tok){ .kind = TokOp, .Op = OpAnd });
+				} else
+					continue;
+				break;
+			case '|':
+				consume(&pos, *(s++));
+				if (s[0] == '|') {
+					emit(&toks, &pos, (Tok){ .kind = TokOp, .Op = OpOr });
+				} else
+					continue;
+				break;
 			case '{':
 			case '}':
 			case '(':

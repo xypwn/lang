@@ -65,6 +65,18 @@ Value eval_binary(IRInstr instr, const Value *lhs, const Value *rhs) {
 				.type.kind = TypeBool,
 				.Bool = res,
 			};
+		case IRAnd:
+			return (Value){
+				.type.kind = TypeBool,
+				.Bool = is_nonzero(lhs) && is_nonzero(rhs),
+			};
+			break;
+		case IROr:
+			return (Value){
+				.type.kind = TypeBool,
+				.Bool = is_nonzero(lhs) || is_nonzero(rhs),
+			};
+			break;
 		default:
 			ASSERT_UNREACHED();
 	}

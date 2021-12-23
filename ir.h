@@ -22,6 +22,8 @@ enum IRInstr {
 	IRLt,
 	IRLe,
 	IRNot,
+	IRAnd,
+	IROr,
 	IRJmp,
 	IRJnz,
 	IRCallInternal,

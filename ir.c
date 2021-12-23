@@ -14,6 +14,8 @@ const char *irinstr_str[IRInstrEnumSize] = {
 	[IRLt]  = "lt",
 	[IRLe]  = "le",
 	[IRNot] = "not",
+	[IRAnd] = "and",
+	[IROr]  = "or",
 	[IRJmp] = "jmp",
 	[IRJnz] = "jnz",
 	[IRCallInternal] = "calli",
@@ -119,6 +121,8 @@ void print_ir(IRToks *v, const BuiltinFunc *builtin_funcs) {
 			case IREq:
 			case IRLt:
 			case IRLe:
+			case IRAnd:
+			case IROr:
 				printf(" %%%zx ", v->toks[i].Binary.addr);
 				print_irparam(&v->toks[i].Binary.lhs);
 				printf(" ");

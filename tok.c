@@ -11,15 +11,17 @@ int8_t op_prec[OperatorEnumSize] = {
 	[OpLCurl]  = PREC_DELIM,
 	[OpRParen] = PREC_DELIM,
 	[OpComma]  = PREC_DELIM,
-	[OpEq]     = 0,
-	[OpLt]     = 0,
-	[OpGt]     = 0,
-	[OpLe]     = 0,
-	[OpGe]     = 0,
-	[OpAdd]    = 1,
-	[OpSub]    = 1,
-	[OpMul]    = 2,
-	[OpDiv]    = 2,
+	[OpAnd]    = 0,
+	[OpOr]     = 0,
+	[OpEq]     = 1,
+	[OpLt]     = 1,
+	[OpGt]     = 1,
+	[OpLe]     = 1,
+	[OpGe]     = 1,
+	[OpAdd]    = 2,
+	[OpSub]    = 2,
+	[OpMul]    = 3,
+	[OpDiv]    = 3,
 };
 
 const char *op_str[OperatorEnumSize] = {
@@ -40,6 +42,8 @@ const char *op_str[OperatorEnumSize] = {
 	[OpGt]     = ">",
 	[OpLe]     = "<=",
 	[OpGe]     = ">=",
+	[OpAnd]    = "&&",
+	[OpOr]     = "||",
 };
 
 const char *tok_str[TokKindEnumSize] = {
