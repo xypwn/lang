@@ -52,7 +52,7 @@ static void set_irtok_dest_addr(IRTok *t, size_t addr) {
 		case IRSub:
 		case IRMul:
 		case IRDiv:
-			t->Arith.addr = addr;
+			t->Binary.addr = addr;
 			break;
 		case IRCallInternal:
 			t->CallI.ret_addr = addr;
@@ -436,7 +436,7 @@ static ExprRet expr(IRToks *out_ir, TokList *toks, Map *funcs, Scope *parent_sc,
 			if (lhs->kind == TokVal && rhs->kind == TokVal) {
 				/* evaluate the constant expression immediately */
 				lhs->kind = TokVal;
-				TRY_RET(lhs->Val = eval_arith(instr, &lhs->Val, &rhs->Val), (ExprRet){0});
+				TRY_RET(lhs->Val = eval_binary(instr, &lhs->Val, &rhs->Val), (ExprRet){0});
 			} else {
 				bool is_last_operation = t == start && r_op_prec == PREC_DELIM;
 
@@ -450,7 +450,7 @@ static ExprRet expr(IRToks *out_ir, TokList *toks, Map *funcs, Scope *parent_sc,
 					.ln = l_op->ln,
 					.col = l_op->col,
 					.instr = instr,
-					.Arith = {
+					.Binary = {
 						.addr = res_addr,
 						.lhs = lhs_irparam,
 						.rhs = rhs_irparam,

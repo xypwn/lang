@@ -2,7 +2,7 @@
 
 #include "util.h"
 
-Value eval_arith(IRInstr instr, const Value *lhs, const Value *rhs) {
+Value eval_binary(IRInstr instr, const Value *lhs, const Value *rhs) {
 	switch (instr) {
 		case IRAdd:
 		case IRSub:

@@ -59,7 +59,7 @@ typedef struct IRTok {
 		struct {
 			size_t addr;
 			IRParam lhs, rhs;
-		} Arith;
+		} Binary;
 
 		struct {
 			size_t iaddr;

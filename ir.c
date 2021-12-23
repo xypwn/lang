@@ -105,10 +105,10 @@ void print_ir(IRToks *v, const BuiltinFunc *builtin_funcs) {
 			case IRSub:
 			case IRDiv:
 			case IRMul:
-				printf(" %%%zx ", v->toks[i].Arith.addr);
-				print_irparam(&v->toks[i].Arith.lhs);
+				printf(" %%%zx ", v->toks[i].Binary.addr);
+				print_irparam(&v->toks[i].Binary.lhs);
 				printf(" ");
-				print_irparam(&v->toks[i].Arith.rhs);
+				print_irparam(&v->toks[i].Binary.rhs);
 				break;
 			case IRJmp:
 				printf(" %zx", v->toks[i].Jmp.iaddr);

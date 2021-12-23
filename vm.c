@@ -63,10 +63,10 @@ void run(const IRToks *ir, const BuiltinFunc *builtin_funcs) {
 			case IRSub:
 			case IRDiv:
 			case IRMul:
-				stack_fit(&s, instr->Arith.addr);
-				TRY_ELSE(s.mem[instr->Arith.addr] = eval_arith(instr->instr,
-					irparam_to_val(&s, &instr->Arith.lhs),
-					irparam_to_val(&s, &instr->Arith.rhs)),
+				stack_fit(&s, instr->Binary.addr);
+				TRY_ELSE(s.mem[instr->Binary.addr] = eval_binary(instr->instr,
+					irparam_to_val(&s, &instr->Binary.lhs),
+					irparam_to_val(&s, &instr->Binary.rhs)),
 					{free(fn_args); stack_term(&s);});
 				break;
 			case IRJmp:
