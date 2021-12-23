@@ -54,6 +54,8 @@ TokList lex(const char *s) {
 			}
 			if (streq_0_n("if", start, i))
 				emit(&toks, &pos, (Tok){ .kind = TokIf });
+			else if (streq_0_n("else", start, i))
+				emit(&toks, &pos, (Tok){ .kind = TokElse });
 			else if (streq_0_n("while", start, i))
 				emit(&toks, &pos, (Tok){ .kind = TokWhile });
 			else {

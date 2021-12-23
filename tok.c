@@ -35,6 +35,7 @@ const char *tok_str[TokKindEnumSize] = {
 	[TokAssign]  = "=",
 	[TokDeclare] = ":=",
 	[TokIf]      = "if",
+	[TokElse]    = "else",
 	[TokWhile]   = "while",
 };
 

@@ -87,7 +87,7 @@ void irtoks_init_long(IRToks *v);
 void irtoks_init_short(IRToks *v);
 void irtoks_term(IRToks *v);
 void irtoks_app(IRToks *v, IRTok t);
-void irtoks_app_irtoks(IRToks *v, IRToks *other);
+void irtoks_eat_irtoks(IRToks *v, IRToks *other, size_t jmp_offset);
 
 void print_ir(IRToks *v, const BuiltinFunc *builtin_funcs);
 

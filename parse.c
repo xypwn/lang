@@ -5,6 +5,8 @@
 #include "map.h"
 #include "runtime.h"
 
+static BuiltinFunc *bf;
+
 typedef struct Scope {
 	struct Scope *parent;
 	size_t mem_addr;
@@ -589,8 +591,17 @@ static void stmt(IRToks *out_ir, TokList *toks, Map *funcs, Scope *sc, TokListIt
 		IRParam cond;
 		TRY_ELSE(cond = expr_into_irparam(&cond_ir, toks, funcs, sc, t->next), irtoks_term(&cond_ir));
 
+		/* parse loop body */
+		TRY_ELSE(stmt(out_ir, toks, funcs, sc, t->next), irtoks_term(&cond_ir));
+
+		/* finally we know where the jmp from the beginning has to jump to */
+		out_ir->toks[jmp_instr_iaddr].Jmp.iaddr = out_ir->len;
+
+		/* append condition IR to program IR, then terminate condition IR stream */
+		irtoks_eat_irtoks(out_ir, &cond_ir, out_ir->len-1);
+
 		/* add conditional jump */
-		irtoks_app(&cond_ir, (IRTok){
+		irtoks_app(out_ir, (IRTok){
 			.ln = t->next->tok.ln,
 			.col = t->next->tok.col,
 			.instr = IRJnz,
@@ -600,17 +611,63 @@ static void stmt(IRToks *out_ir, TokList *toks, Map *funcs, Scope *sc, TokListIt
 			},
 		});
 
-		/* parse loop body */
-		TRY_ELSE(stmt(out_ir, toks, funcs, sc, t->next), irtoks_term(&cond_ir));
-
-		/* finally we know where the jmp from the beginning has to jump to */
-		out_ir->toks[jmp_instr_iaddr].Jmp.iaddr = out_ir->len;
-
-		/* append condition IR to program IR, then terminate condition IR stream */
-		irtoks_app_irtoks(out_ir, &cond_ir);
-		irtoks_term(&cond_ir);
-
 		t = t->next;
+	} else if (t->tok.kind == TokIf) {
+		/* How if is generally implemented in IR: 
+		 * 0: some stuff evaluating condition xyz
+		 * 1: jmp to 5 if condition xyz is met
+		 * 2: some_code in else
+		 * 4: jmp to 6
+		 * 5: some_code in if
+		 * */
+
+		/* parse condition */
+		IRParam cond;
+		TRY(cond = expr_into_irparam(out_ir, toks, funcs, sc, t->next));
+
+		/* add conditional jmp instruction */
+		size_t if_cjmp_instr_iaddr = out_ir->len;
+		irtoks_app(out_ir, (IRTok){
+			.ln = t->tok.ln,
+			.col = t->tok.col,
+			.instr = IRJnz,
+			.CJmp = {
+				.iaddr = 0, /* unknown for now */
+				.condition = cond,
+			},
+		});
+
+		/* parse if body */
+		IRToks if_body;
+		irtoks_init_short(&if_body);
+		TRY_ELSE(stmt(&if_body, toks, funcs, sc, t->next), irtoks_term(&if_body));
+
+		if (t->next->tok.kind == TokElse) {
+			toklist_del(toks, t->next, t->next);
+
+			/* parse and add else body */
+			TRY_ELSE(stmt(out_ir, toks, funcs, sc, t->next), irtoks_term(&if_body));
+		}
+
+		/* add jmp instruction to jump back to common code */
+		size_t else_jmp_instr_iaddr = out_ir->len;
+		irtoks_app(out_ir, (IRTok){
+			.ln = t->tok.ln,
+			.col = t->tok.col,
+			.instr = IRJmp,
+			.Jmp = {
+				.iaddr = 0, /* unknown for now */
+			},
+		});
+
+		/* set if condition jmp target */
+		out_ir->toks[if_cjmp_instr_iaddr].CJmp.iaddr = out_ir->len;
+		
+		/* add if body */
+		irtoks_eat_irtoks(out_ir, &if_body, out_ir->len-1);
+
+		/* set else jmp target */
+		out_ir->toks[else_jmp_instr_iaddr].CJmp.iaddr = out_ir->len;
 	} else if (t->tok.kind == TokOp && t->tok.Op == OpNewLn) {
 	} else {
 		/* assume expression */
@@ -621,6 +678,8 @@ static void stmt(IRToks *out_ir, TokList *toks, Map *funcs, Scope *sc, TokListIt
 }
 
 IRToks parse(TokList *toks, BuiltinFunc *builtin_funcs, size_t n_builtin_funcs) {
+	bf = builtin_funcs;
+
 	Map funcs;
 	map_init(&funcs, sizeof(BuiltinFunc));
 	for (size_t i = 0; i < n_builtin_funcs; i++) {

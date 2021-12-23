@@ -69,6 +69,7 @@ typedef struct Tok {
 		TokAssign,
 		TokDeclare,
 		TokIf,
+		TokElse,
 		TokWhile,
 		TokKindEnumSize,
 	} kind;

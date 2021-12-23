@@ -49,11 +49,21 @@ void irtoks_app(IRToks *v, IRTok t) {
 	v->toks[v->len++] = t;
 }
 
-void irtoks_app_irtoks(IRToks *v, IRToks *other) {
+void irtoks_eat_irtoks(IRToks *v, IRToks *other, size_t jmp_offset) {
 	if (v->len+other->len > v->cap)
 		v->toks = xrealloc(v->toks, sizeof(IRTok) * (other->len + (v->cap *= 2)));
-	for (size_t i = 0; i < other->len; i++)
+	for (size_t i = 0; i < other->len; i++) {
+		/* correct for changed jump addresses */
+		if (other->toks[i].instr == IRJmp)
+			other->toks[i].Jmp.iaddr += jmp_offset;
+		else if (other->toks[i].instr == IRJnz)
+			other->toks[i].CJmp.iaddr += jmp_offset;
+
 		v->toks[v->len++] = other->toks[i];
+	}
+	/* We're not calling irtoks_term() because we don't want associated items
+	 * (for example function arguments) to get deallocated as well. */
+	free(other->toks);
 }
 
 static void print_val(const Value *v);
