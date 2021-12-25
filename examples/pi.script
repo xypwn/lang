@@ -13,4 +13,5 @@ while k < iterations {
 	k = k + 1
 }
 
+put("π ≈ ")
 print(sum)
