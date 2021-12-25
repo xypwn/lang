@@ -22,6 +22,7 @@ typedef struct Type {
 } Type;
 
 extern size_t type_size[TypeEnumSize];
+extern const char *type_str[TypeEnumSize];
 
 typedef struct Value {
 	Type type;

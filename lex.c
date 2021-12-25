@@ -2,6 +2,8 @@
 
 #include "util.h"
 
+#define TAB_WIDTH 4
+
 typedef struct Pos {
 	size_t ln, col;     /* current position */
 	size_t m_ln, m_col; /* marked position */
@@ -17,7 +19,9 @@ static void consume(Pos *p, char c) {
 	if (c == '\n') {
 		p->ln++;
 		p->col = 1;
-	} else
+	} else if (c == '\t')
+		p->col += TAB_WIDTH;
+	else
 		p->col++;
 }
 

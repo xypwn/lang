@@ -292,6 +292,7 @@ static ExprRet expr(IRToks *out_ir, TokList *toks, Map *funcs, Scope *parent_sc,
 				Value *arg_vals = args_len ? xmalloc(sizeof(Value) * args_len) : NULL;
 				for (size_t i = 0; i < args_len; i++)
 					arg_vals[i] = args[i].Literal;
+				mark_err(&func_ident->tok);
 				func_ident->tok = (Tok) {
 					.kind = TokVal,
 					.Val = func.func(arg_vals),
@@ -348,6 +349,7 @@ static ExprRet expr(IRToks *out_ir, TokList *toks, Map *funcs, Scope *parent_sc,
 			if (v->kind == TokVal) {
 				/* immediately perform operation */
 				t->tok.kind = TokVal;
+				mark_err(&t->tok);
 				TRY_RET(t->tok.Val = eval_unary(unary_op, &v->Val), (ExprRet){0});
 			} else {
 				size_t res_addr = is_last_operation ? 0 : sc.mem_addr++;
@@ -472,6 +474,7 @@ static ExprRet expr(IRToks *out_ir, TokList *toks, Map *funcs, Scope *parent_sc,
 				Value *lhs_val = swap_operands ? &rhs->Val : &lhs->Val;
 				Value *rhs_val = swap_operands ? &lhs->Val : &rhs->Val;
 				lhs->kind = TokVal;
+				mark_err(l_op);
 				TRY_RET(lhs->Val = eval_binary(instr, lhs_val, rhs_val), (ExprRet){0});
 			} else {
 				bool is_last_operation = t == start && r_op_prec == PREC_DELIM;
@@ -532,6 +535,8 @@ static void expr_into_addr(IRToks *out_ir, TokList *toks, Map *funcs, Scope *par
 		IRParam res;
 		TRY(res = tok_to_irparam(parent_sc, &t->tok));
 		irtoks_app(out_ir, (IRTok){
+			.ln = t->tok.ln,
+			.col = t->tok.col,
 			.instr = IRSet,
 			.Unary = {
 				.addr = addr,

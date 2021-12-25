@@ -14,6 +14,15 @@ size_t type_size[TypeEnumSize] = {
 	[TypeArr]   = sizeof(((Value*)NULL)->Arr),
 };
 
+const char *type_str[TypeEnumSize] = {
+	[TypeVoid]  = "void",
+	[TypeFloat] = "float",
+	[TypeInt]   = "int",
+	[TypeBool]  = "bool",
+	[TypeChar]  = "char",
+	[TypeArr]   = "arr",
+};
+
 void print_value(const Value *v, bool raw) {
 	switch (v->type.kind) {
 		case TypeVoid:

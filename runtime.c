@@ -35,7 +35,7 @@ Value eval_binary(IRInstr instr, const Value *lhs, const Value *rhs) {
 					.Float = res,
 				};
 			} else {
-				set_err("Unsupported types for operation '%s'", irinstr_str[instr]);
+				set_err("Unsupported types for operation '%s': %s and %s", irinstr_str[instr], type_str[lhs->type.kind], type_str[rhs->type.kind]);
 				return (Value){0};
 			}
 		}
@@ -58,7 +58,7 @@ Value eval_binary(IRInstr instr, const Value *lhs, const Value *rhs) {
 					default: ASSERT_UNREACHED();
 				};
 			} else {
-				set_err("Unsupported types for operation '%s'", irinstr_str[instr]);
+				set_err("Unsupported types for operation '%s': %s and %s", irinstr_str[instr], type_str[lhs->type.kind], type_str[rhs->type.kind]);
 				return (Value){0};
 			}
 			return (Value){
@@ -93,14 +93,14 @@ Value eval_unary(IRInstr instr, const Value *v) {
 			else if (v->type.kind == TypeFloat)
 				return (Value){ .type.kind = TypeFloat, .Float = -v->Float };
 			else {
-				set_err("Unsupported type for operation '%s'", irinstr_str[instr]);
+				set_err("Unsupported type for operation '%s': %s", irinstr_str[instr], type_str[v->type.kind]);
 				return (Value){0};
 			}
 		case IRNot:
 			if (v->type.kind == TypeBool) {
 				return (Value){ .type.kind = TypeBool, .Bool = !v->Bool };
 			} else {
-				set_err("Unsupported type for operation '%s'", irinstr_str[instr]);
+				set_err("Unsupported type for operation '%s': %s", irinstr_str[instr], type_str[v->type.kind]);
 				return (Value){0};
 			}
 		default:
