@@ -13,22 +13,35 @@ typedef struct Type {
 		TypeInt,
 		TypeBool,
 		TypeChar,
+		TypeArr,
+		TypeEnumSize,
 	} kind;
 
 	/*union {
 	};*/
 } Type;
 
+extern size_t type_size[TypeEnumSize];
+
 typedef struct Value {
 	Type type;
 
 	union {
+		pseudo_void Void;
 		double Float;
 		ssize_t Int;
 		bool Bool;
 		char Char;
+		struct {
+			bool is_string : 1;
+			Type type;
+			void *vals;
+			size_t len, cap;
+		} Arr;
 	};
 } Value;
+
+void print_value(const Value *v, bool raw);
 
 enum Operator {
 	OpLCurl  = '{',

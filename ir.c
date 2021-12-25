@@ -72,32 +72,11 @@ void irtoks_eat_irtoks(IRToks *v, IRToks *other, size_t jmp_offset) {
 	free(other->toks);
 }
 
-static void print_val(const Value *v);
 static void print_irparam(const IRParam *p);
-
-static void print_val(const Value *v) {
-	switch (v->type.kind) {
-		case TypeFloat:
-			printf("%f", v->Float);
-			break;
-		case TypeInt:
-			printf("%zd", v->Int);
-			break;
-		case TypeBool:
-			printf("%s", v->Bool ? "true" : "false");
-			break;
-		case TypeChar:
-			printf("'%c'", v->Char);
-			break;
-		default:
-			printf("(unknown type)");
-			break;
-	}
-}
 
 static void print_irparam(const IRParam *p) {
 	if (p->kind == IRParamLiteral) {
-		print_val(&p->Literal);
+		print_value(&p->Literal, false);
 	} else if (p->kind == IRParamAddr) {
 		printf("%%%zd", p->Addr);
 	}

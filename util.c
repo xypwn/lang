@@ -168,6 +168,23 @@ double stod(const char *s, size_t n, ssize_t *endpos) {
 	return res;
 }
 
+const char *unescape_char(char c) {
+	switch (c) {
+		case '\a':   return "\\a";
+		case '\b':   return "\\b";
+		case '\033': return "\\e";
+		case '\f':   return "\\f";
+		case '\n':   return "\\n";
+		case '\r':   return "\\r";
+		case '\t':   return "\\t";
+		case '\v':   return "\\v";
+		case '\\':   return "\\\\";
+		case '\'':   return "\\'";
+		case '"':    return "\\\"";
+		default:     return NULL;
+	}
+}
+
 char *mreadfile(FILE *fp) {
 	if (fseek(fp, 0l, SEEK_END) == -1)
 		return NULL;

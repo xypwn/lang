@@ -54,7 +54,7 @@ static char get_esc_char(char c) {
 	}
 }
 
-TokList lex(const char *s) {
+TokList lex(const char *s, Pool *static_vars) {
 	TokList toks;
 	toklist_init(&toks);
 	Pos pos = { .ln = 1, .col = 1 };
@@ -297,6 +297,52 @@ TokList lex(const char *s) {
 					return toks;
 				}
 				emit(&toks, &pos, (Tok){ .kind = TokVal, .Val = { .type = { .kind = TypeChar, }, .Char = c, }, });
+				break;
+			}
+			case '"': {
+				consume(&pos, *(s++));
+				const char *start = s;
+				Pos start_pos = pos;
+				size_t size = 0;
+
+				/* count the string size before allocating */
+				while (s[0] != '"') {
+					if (!s[0]) {
+						set_err("Unexpected EOF in string literal");
+						return toks;
+					} else if (s[0] == '\\')
+						consume(&pos, *(s++));
+					consume(&pos, *(s++));
+					size++;
+				}
+
+				/* go through the actual string */
+				s = start;
+				pos = start_pos;
+				char *str = pool_alloc(static_vars, type_size[TypeChar] * size);
+				for (size_t i = 0; i < size; i++) {
+					char c = s[0];
+					if (c == '\\') {
+						consume(&pos, *(s++));
+						c = get_esc_char(s[0]);
+						if (!c) {
+							set_err("Unrecognized escape sequence: '\\%c'", c);
+							return toks;
+						}
+					}
+					consume(&pos, *(s++));
+					str[i] = c;
+				}
+				emit(&toks, &pos, (Tok){ .kind = TokVal, .Val = {
+						.type.kind = TypeArr,
+						.Arr = {
+							.is_string = true,
+							.type.kind = TypeChar,
+							.vals = str,
+							.len = size,
+							.cap = size,
+						},
+					},});
 				break;
 			}
 			default:

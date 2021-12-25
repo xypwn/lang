@@ -8,6 +8,8 @@
 #include <string.h>
 #include <unistd.h>
 
+typedef uint8_t pseudo_void;
+
 /* some ANSI color codes */
 #define C_RED     "\x1b[31m"
 #define C_GREEN   "\x1b[32m"
@@ -67,6 +69,8 @@ char *psndup(Pool *p, const char *s, size_t n);
 intmax_t stoimax(const char *s, size_t n, size_t base, ssize_t *endpos /* -1 on success */);
 /* convert a non-null-terminated string to a double */
 double stod(const char *s, size_t n, ssize_t *endpos /* -1 on success */);
+/* return the escape sequence for a given character; return NULL if there is none */
+const char *unescape_char(char c);
 
 /* sets errno on failure */
 char *mreadfile(FILE *fp);

@@ -5,6 +5,75 @@
 
 #include "util.h"
 
+size_t type_size[TypeEnumSize] = {
+	[TypeVoid]  = 0,
+	[TypeFloat] = sizeof(((Value*)NULL)->Float),
+	[TypeInt]   = sizeof(((Value*)NULL)->Int),
+	[TypeBool]  = sizeof(((Value*)NULL)->Bool),
+	[TypeChar]  = sizeof(((Value*)NULL)->Char),
+	[TypeArr]   = sizeof(((Value*)NULL)->Arr),
+};
+
+void print_value(const Value *v, bool raw) {
+	switch (v->type.kind) {
+		case TypeVoid:
+			printf("(void)");
+			break;
+		case TypeFloat:
+			printf("%f", v->Float);
+			break;
+		case TypeInt:
+			printf("%zd", v->Int);
+			break;
+		case TypeBool:
+			printf("%s", v->Bool ? "true" : "false");
+			break;
+		case TypeChar:
+			if (raw)
+				printf("%c", v->Char);
+			else {
+				const char *esc = unescape_char(v->Char);
+				if (esc) printf("'%s'", esc);
+				else     printf("'%c'", v->Char);
+			}
+			break;
+		case TypeArr:
+			if (v->Arr.is_string) {
+				if (v->Arr.type.kind != TypeChar)
+					ASSERT_UNREACHED();
+				char *str = v->Arr.vals;
+				if (!raw)
+					printf("\"");
+				for (size_t i = 0; i < v->Arr.len; i++) {
+					char c = str[i];
+					if (raw)
+						printf("%c", c);
+					else {
+						const char *esc = unescape_char(c);
+						if (esc) printf("%s", esc);
+						else     printf("%c", c);
+					}
+				}
+				if (!raw)
+					printf("\"");
+			} else {
+				printf("[");
+				for (size_t i = 0;; i++) {
+					size_t ty_sz = type_size[v->Arr.type.kind];
+					Value ty_val = { .type = v->Arr.type };
+					memcpy(&ty_val.Void, (uint8_t*)v->Arr.vals + ty_sz * i, ty_sz);
+					print_value(&ty_val, false);
+					if (i == v->Arr.len-1) break;
+					printf(", ");
+				}
+				printf("]");
+			}
+			break;
+		default:
+			ASSERT_UNREACHED();
+	}
+}
+
 int8_t op_prec[OperatorEnumSize] = {
 	[OpEOF]    = PREC_DELIM,
 	[OpNewLn]  = PREC_DELIM,
@@ -108,24 +177,9 @@ void print_toks(TokList *l) {
 				printf(": " C_ICYAN "%s" C_RESET, op_str[i->tok.Op]);
 				break;
 			case TokVal:
-				printf(C_IYELLOW "Val" C_RESET);
-				switch (i->tok.Val.type.kind) {
-					case TypeFloat:
-						printf(": " C_ICYAN "%f" C_RESET, i->tok.Val.Float);
-						break;
-					case TypeInt:
-						printf(": " C_ICYAN "%zd" C_RESET, i->tok.Val.Int);
-						break;
-					case TypeBool:
-						printf(": " C_ICYAN "%s" C_RESET, i->tok.Val.Bool ? "true" : "false");
-						break;
-					case TypeChar:
-						printf(": " C_ICYAN "'%c'" C_RESET, i->tok.Val.Char);
-						break;
-					default:
-						printf(" " C_ICYAN "(unknown type)" C_RESET);
-						break;
-				}
+				printf(C_IYELLOW "Val" C_RESET ": " C_ICYAN);
+				print_value(&i->tok.Val, false);
+				printf(C_RESET);
 				break;
 			case TokIdent:
 				printf(C_IYELLOW "Ident" C_RESET);

@@ -34,15 +34,7 @@ static void die(const char *fmt, ...) {
 }
 
 static Value fn_put(Value *args) {
-	switch (args[0].type.kind) {
-		case TypeVoid:  printf("(void)");                              break;
-		case TypeFloat: printf("%f", args[0].Float);                   break;
-		case TypeInt:   printf("%zd", args[0].Int);                    break;
-		case TypeBool:  printf("%s", args[0].Bool ? "true" : "false"); break;
-		case TypeChar:  printf("%c", args[0].Char);                    break;
-		default:
-			ASSERT_UNREACHED();
-	}
+	print_value(&args[0], true);
 	return (Value){0};
 }
 
@@ -136,9 +128,11 @@ int main(int argc, const char **argv) {
 	}
 	fclose(fp);
 	/* lex source file */
-	TokList tokens = lex(file);
+	Pool *static_vars = pool_new(4096);
+	TokList tokens = lex(file, static_vars);
 	if (err) {
 		toklist_term(&tokens);
+		pool_term(static_vars);
 		free(file);
 		fprintf(stderr, C_IRED "Lexer error" C_RESET " in " C_CYAN "%s" C_RESET ":%zu:%zu: %s\n", filename, err_ln, err_col, errbuf);
 		return 1;
@@ -158,6 +152,7 @@ int main(int argc, const char **argv) {
 	if (err) {
 		irtoks_term(&ir);
 		toklist_term(&tokens);
+		pool_term(static_vars);
 		fprintf(stderr, C_IRED "Parser error" C_RESET " in " C_CYAN "%s" C_RESET ":%zu:%zu: %s\n", filename, err_ln, err_col, errbuf);
 		return 1;
 	}
@@ -169,9 +164,11 @@ int main(int argc, const char **argv) {
 		run(&ir, funcs);
 		if (err) {
 			irtoks_term(&ir);
+			pool_term(static_vars);
 			fprintf(stderr, C_IRED "Runtime error" C_RESET " in " C_CYAN "%s" C_RESET ":%zu:%zu: %s\n", filename, err_ln, err_col, errbuf);
 			return 1;
 		}
 	}
 	irtoks_term(&ir);
+	pool_term(static_vars);
 }
