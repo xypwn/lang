@@ -97,4 +97,6 @@ void irtoks_eat_irtoks(IRToks *v, IRToks *other, size_t jmp_offset);
 
 void print_ir(IRToks *v, const BuiltinFunc *builtin_funcs);
 
+void optimize_ir(IRToks *v);
+
 #endif /* IR_H */

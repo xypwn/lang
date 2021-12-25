@@ -124,9 +124,24 @@ void print_ir(IRToks *v, const BuiltinFunc *builtin_funcs) {
 				}
 				break;
 			}
-			default: ASSERT_UNREACHED(); break;
+			default: ASSERT_UNREACHED();
 		}
 		printf(" ; %zu:%zu", v->toks[i].ln, v->toks[i].col);
 		printf("\n");
+	}
+}
+
+void optimize_ir(IRToks *v) {
+	for (size_t i = 0; i < v->len; i++) {
+		switch (v->toks[i].instr) {
+			case IRJmp: {
+				/* resolve jump chains (esp. produced by if-else-if... statements) */
+				size_t ja = i;
+				while (v->toks[ja].instr == IRJmp)
+					ja = v->toks[ja].Jmp.iaddr;
+				v->toks[i].Jmp.iaddr = ja;
+			}
+			default: break;
+		}
 	}
 }

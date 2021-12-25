@@ -167,6 +167,7 @@ int main(int argc, const char **argv) {
 		return 1;
 	}
 	toklist_term(&tokens);
+	optimize_ir(&ir);
 	if (opt_emit_ir)
 		print_ir(&ir, funcs);
 	/* run the IR */
