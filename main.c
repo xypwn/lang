@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 #include "ir.h"
 #include "lex.h"
@@ -77,10 +78,19 @@ static Value fn_pow(Value *args) {
 		set_err("pow() requires arguments of type float");
 		return (Value){0};
 	}
-	return (Value) {
+	return (Value){
 		.type.kind = TypeFloat,
 		.Float = pow(args[0].Float, args[1].Float),
 	};
+}
+
+static Value fn_sleep(Value *args) {
+	if (!(args[0].type.kind == TypeFloat && args[0].Float >= 0.0)) {
+		set_err("sleep() requires a positive float");
+		return (Value){0};
+	}
+	sleep_secs(args[0].Float);
+	return (Value){0};
 }
 
 int main(int argc, const char **argv) {
@@ -147,6 +157,7 @@ int main(int argc, const char **argv) {
 		{ .name = "int",   .side_effects = false, .n_args = 1, .func = fn_int,   },
 		{ .name = "float", .side_effects = false, .n_args = 1, .func = fn_float, },
 		{ .name = "pow",   .side_effects = false, .n_args = 2, .func = fn_pow,   },
+		{ .name = "sleep", .side_effects = true,  .n_args = 1, .func = fn_sleep, },
 	};
 	IRToks ir = parse(&tokens, funcs, sizeof(funcs) / sizeof(funcs[0]));
 	if (err) {

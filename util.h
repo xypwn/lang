@@ -6,7 +6,13 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <unistd.h>
+
+#ifdef WIN32
+#include <windows.h> /* SSIZE_T */
+typedef SSIZE_T ssize_t;
+#else
+#include <unistd.h> /* ssize_t */
+#endif
 
 typedef uint8_t pseudo_void;
 
@@ -28,6 +34,8 @@ typedef uint8_t pseudo_void;
 #define C_ICYAN    "\x1b[36;1m"
 
 #define C_RESET   "\x1b[m"
+
+void sleep_secs(double secs);
 
 #define ERRSZ 4096
 extern char errbuf[ERRSZ];

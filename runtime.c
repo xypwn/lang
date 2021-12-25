@@ -41,7 +41,7 @@ Value eval_binary(IRInstr instr, const Value *lhs, const Value *rhs) {
 		}
 		case IREq:
 		case IRLt:
-		case IRLe:
+		case IRLe: {
 			bool res;
 			if (lhs->type.kind == TypeInt && rhs->type.kind == TypeInt) {
 				switch (instr) {
@@ -65,6 +65,7 @@ Value eval_binary(IRInstr instr, const Value *lhs, const Value *rhs) {
 				.type.kind = TypeBool,
 				.Bool = res,
 			};
+		}
 		case IRAnd:
 			return (Value){
 				.type.kind = TypeBool,

@@ -2,6 +2,23 @@
 
 #include <stdarg.h>
 
+#ifdef WIN32
+#include <windows.h> /* Sleep */
+#else
+#include <time.h> /* nanosleep */
+#endif
+
+void sleep_secs(double secs) {
+#ifdef WIN32
+	Sleep(secs * 1000.0);
+#else
+	struct timespec ts;
+	ts.tv_sec = (time_t)secs;
+	ts.tv_nsec = (secs - (double)ts.tv_sec) * 1000000000.0;
+	nanosleep(&ts, NULL);
+#endif
+}
+
 char errbuf[ERRSZ];
 bool err;
 size_t err_ln, err_col;

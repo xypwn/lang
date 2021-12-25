@@ -1,6 +1,9 @@
-CFLAGS  = -ggdb -std=c11 -Wall -Wextra -pedantic -Wmissing-prototypes -Wstrict-prototypes -Wold-style-definition
-#CFLAGS  = -pg -std=c11 -Wall -Wextra -pedantic -Wmissing-prototypes -Wstrict-prototypes -Wold-style-definition
-#CFLAGS  = -O3 -std=c11 -Wall -Wextra -pedantic -Wmissing-prototypes -Wstrict-prototypes -Wold-style-definition
+ifneq ($(OS),Windows_NT)
+	DEFS = -D_POSIX_C_SOURCE=200112L
+endif
+CFLAGS  = $(DEFS) -ggdb -std=c11 -Wall -Wextra -pedantic -Wmissing-prototypes -Wstrict-prototypes -Wold-style-definition
+#CFLAGS  = $(DEFS) -pg -std=c11 -Wall -Wextra -pedantic -Wmissing-prototypes -Wstrict-prototypes -Wold-style-definition
+#CFLAGS  = $(DEFS) -O3 -std=c11 -Wall -Wextra -pedantic -Wmissing-prototypes -Wstrict-prototypes -Wold-style-definition
 LDFLAGS = -lm
 SOURCE  = main.c util.c tok.c lex.c ir.c parse.c runtime.c vm.c map.c
 HEADERS =        util.h tok.h lex.h ir.h parse.h runtime.h vm.h map.h
