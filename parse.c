@@ -640,6 +640,7 @@ static void stmt(IRToks *out_ir, TokList *toks, Map *funcs, Scope *sc, TokListIt
 		TRY_ELSE(cond = expr_into_irparam(&cond_ir, toks, funcs, sc, t->next), irtoks_term(&cond_ir));
 
 		/* parse loop body */
+		skip_newlns(toks, t->next);
 		TRY_ELSE(stmt(out_ir, toks, funcs, sc, t->next), irtoks_term(&cond_ir));
 
 		/* finally we know where the jmp from the beginning has to jump to */
@@ -686,16 +687,17 @@ static void stmt(IRToks *out_ir, TokList *toks, Map *funcs, Scope *sc, TokListIt
 		});
 
 		/* parse if body */
+		skip_newlns(toks, t->next);
 		IRToks if_body;
 		irtoks_init_short(&if_body);
 		TRY_ELSE(stmt(&if_body, toks, funcs, sc, t->next), irtoks_term(&if_body));
 
 		skip_newlns(toks, t->next);
-
 		if (t->next->tok.kind == TokElse) {
 			toklist_del(toks, t->next, t->next);
 
 			/* parse and add else body */
+			skip_newlns(toks, t->next);
 			TRY_ELSE(stmt(out_ir, toks, funcs, sc, t->next), irtoks_term(&if_body));
 		}
 
