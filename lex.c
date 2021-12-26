@@ -222,18 +222,27 @@ TokList lex(const char *s, Pool *static_vars) {
 					continue;
 				}
 				break;
+			case '!':
+				consume(&pos, *(s++));
+				if (s[0] == '=')
+					emit(&toks, &pos, (Tok){ .kind = TokOp, .Op = OpNeq, });
+				else {
+					emit(&toks, &pos, (Tok){ .kind = TokOp, .Op = OpNot, });
+					continue;
+				}
+				break;
 			case '&':
 				consume(&pos, *(s++));
-				if (s[0] == '&') {
+				if (s[0] == '&')
 					emit(&toks, &pos, (Tok){ .kind = TokOp, .Op = OpAnd });
-				} else
+				else
 					continue;
 				break;
 			case '|':
 				consume(&pos, *(s++));
-				if (s[0] == '|') {
+				if (s[0] == '|')
 					emit(&toks, &pos, (Tok){ .kind = TokOp, .Op = OpOr });
-				} else
+				else
 					continue;
 				break;
 			case '{':
@@ -244,7 +253,6 @@ TokList lex(const char *s, Pool *static_vars) {
 			case '+':
 			case '-':
 			case '*':
-			case '!':
 				emit(&toks, &pos, (Tok){
 						.kind = TokOp,
 						.Op = s[0],

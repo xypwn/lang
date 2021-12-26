@@ -65,6 +65,7 @@ void run(const IRToks *ir, const BuiltinFunc *builtin_funcs) {
 			case IRDiv:
 			case IRMul:
 			case IREq:
+			case IRNeq:
 			case IRLt:
 			case IRLe:
 			case IRAnd:

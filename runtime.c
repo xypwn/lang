@@ -40,21 +40,24 @@ Value eval_binary(IRInstr instr, const Value *lhs, const Value *rhs) {
 			}
 		}
 		case IREq:
+		case IRNeq:
 		case IRLt:
 		case IRLe: {
 			bool res;
 			if (lhs->type.kind == TypeInt && rhs->type.kind == TypeInt) {
 				switch (instr) {
-					case IREq: res = lhs->Int == rhs->Int; break;
-					case IRLt: res = lhs->Int <  rhs->Int; break;
-					case IRLe: res = lhs->Int <= rhs->Int; break;
+					case IREq:  res = lhs->Int == rhs->Int; break;
+					case IRNeq: res = lhs->Int != rhs->Int; break;
+					case IRLt:  res = lhs->Int <  rhs->Int; break;
+					case IRLe:  res = lhs->Int <= rhs->Int; break;
 					default: ASSERT_UNREACHED();
 				};
 			} else if (lhs->type.kind == TypeFloat && rhs->type.kind == TypeFloat) {
 				switch (instr) {
-					case IREq: res = lhs->Float == rhs->Float; break;
-					case IRLt: res = lhs->Float <  rhs->Float; break;
-					case IRLe: res = lhs->Float <= rhs->Float; break;
+					case IREq:  res = lhs->Float == rhs->Float; break;
+					case IRNeq: res = lhs->Float != rhs->Float; break;
+					case IRLt:  res = lhs->Float <  rhs->Float; break;
+					case IRLe:  res = lhs->Float <= rhs->Float; break;
 					default: ASSERT_UNREACHED();
 				};
 			} else if (lhs->type.kind == TypeArr && lhs->Arr.type.kind == TypeChar && lhs->Arr.is_string &&
@@ -62,6 +65,9 @@ Value eval_binary(IRInstr instr, const Value *lhs, const Value *rhs) {
 				switch (instr) {
 					case IREq:
 						res = lhs->Arr.len == rhs->Arr.len ? strncmp(lhs->Arr.vals, rhs->Arr.vals, lhs->Arr.len) == 0 : false;
+						break;
+					case IRNeq:
+						res = lhs->Arr.len == rhs->Arr.len ? strncmp(lhs->Arr.vals, rhs->Arr.vals, lhs->Arr.len) != 0 : true;
 						break;
 					default:
 						set_err("String operation '%s' not supported", irinstr_str[instr]);

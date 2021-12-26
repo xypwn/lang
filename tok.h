@@ -57,6 +57,7 @@ enum Operator {
 	OpNot    = '!',
 	OpBeginNonchars = 256,
 	OpEq,
+	OpNeq,
 	OpLt,
 	OpGt,
 	OpLe,

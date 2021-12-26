@@ -11,6 +11,7 @@ const char *irinstr_str[IRInstrEnumSize] = {
 	[IRMul] = "mul",
 	[IRDiv] = "div",
 	[IREq]  = "eq",
+	[IRNeq] = "neq",
 	[IRLt]  = "lt",
 	[IRLe]  = "le",
 	[IRNot] = "not",
@@ -98,6 +99,7 @@ void print_ir(IRToks *v, const BuiltinFunc *builtin_funcs) {
 			case IRDiv:
 			case IRMul:
 			case IREq:
+			case IRNeq:
 			case IRLt:
 			case IRLe:
 			case IRAnd:

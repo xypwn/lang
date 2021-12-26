@@ -19,6 +19,7 @@ enum IRInstr {
 	IRMul,
 	IRDiv,
 	IREq,
+	IRNeq,
 	IRLt,
 	IRLe,
 	IRNot,

@@ -54,6 +54,7 @@ static void set_irtok_dest_addr(IRTok *t, size_t addr) {
 		case IRMul:
 		case IRDiv:
 		case IREq:
+		case IRNeq:
 		case IRLt:
 		case IRLe:
 		case IRAnd:
@@ -457,6 +458,7 @@ static ExprRet expr(IRToks *out_ir, TokList *toks, Map *funcs, Scope *parent_sc,
 				case OpMul: instr = IRMul; break;
 				case OpDiv: instr = IRDiv; break;
 				case OpEq:  instr = IREq;  break;
+				case OpNeq: instr = IRNeq; break;
 				case OpLt:  instr = IRLt;  break;
 				case OpLe:  instr = IRLe;  break;
 				case OpGt:  instr = IRLt; swap_operands = true; break;
