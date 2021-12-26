@@ -36,6 +36,7 @@ static bool expr_flush_ir_and_maybe_return(IRToks *out_ir, TokList *toks, IRTok 
 static ExprRet expr(IRToks *out_ir, TokList *toks, Map *funcs, Scope *parent_sc, TokListItem *t);
 static void expr_into_addr(IRToks *out_ir, TokList *toks, Map *funcs, Scope *parent_sc, TokListItem *t, size_t addr);
 static IRParam expr_into_irparam(IRToks *out_ir, TokList *toks, Map *funcs, Scope *parent_sc, TokListItem *t);
+static void skip_newlns(TokList *toks, TokListItem *from);
 static void stmt(IRToks *out_ir, TokList *toks, Map *funcs, Scope *sc, TokListItem *t);
 
 static void mark_err(const Tok *t) {
@@ -564,6 +565,16 @@ static IRParam expr_into_irparam(IRToks *out_ir, TokList *toks, Map *funcs, Scop
 		ASSERT_UNREACHED();
 }
 
+/* This WILL invalidate *from, so the caller should only call it on a
+ * TokListItem after any ones that are in use (e.g. skip_newlns(t->next)). */
+static void skip_newlns(TokList *toks, TokListItem *from) {
+	TokListItem *curr = from;
+	while (curr->tok.kind == TokOp && curr->tok.Op == OpNewLn)
+		curr = curr->next;
+	if (curr != from)
+		toklist_del(toks, from, curr->prev);
+}
+
 static void stmt(IRToks *out_ir, TokList *toks, Map *funcs, Scope *sc, TokListItem *t) {
 	TokListItem *start = t;
 	if (t->tok.kind == TokIdent && t->tok.Ident.kind == IdentName && (t->next->tok.kind == TokDeclare || t->next->tok.kind == TokAssign)) {
@@ -587,6 +598,7 @@ static void stmt(IRToks *out_ir, TokList *toks, Map *funcs, Scope *sc, TokListIt
 	} else if (t->tok.kind == TokOp && t->tok.Op == OpLCurl) {
 		Scope inner_sc = make_scope(sc, true);
 		for (;;) {
+			skip_newlns(toks, t->next);
 			if (t->next->tok.kind == TokOp) {
 				if (t->next->tok.Op == OpEOF) {
 					term_scope(&inner_sc);
@@ -678,6 +690,8 @@ static void stmt(IRToks *out_ir, TokList *toks, Map *funcs, Scope *sc, TokListIt
 		irtoks_init_short(&if_body);
 		TRY_ELSE(stmt(&if_body, toks, funcs, sc, t->next), irtoks_term(&if_body));
 
+		skip_newlns(toks, t->next);
+
 		if (t->next->tok.kind == TokElse) {
 			toklist_del(toks, t->next, t->next);
 
@@ -704,7 +718,6 @@ static void stmt(IRToks *out_ir, TokList *toks, Map *funcs, Scope *sc, TokListIt
 
 		/* set else jmp target */
 		out_ir->toks[else_jmp_instr_iaddr].CJmp.iaddr = out_ir->len;
-	} else if (t->tok.kind == TokOp && t->tok.Op == OpNewLn) {
 	} else {
 		/* assume expression */
 		TRY(expr_into_irparam(out_ir, toks, funcs, sc, t));
@@ -733,6 +746,7 @@ IRToks parse(TokList *toks, BuiltinFunc *builtin_funcs, size_t n_builtin_funcs) 
 	irtoks_init_long(&ir);
 	Scope global_scope = make_scope(NULL, true);
 	for (;;) {
+		skip_newlns(toks, toks->begin);
 		if (toks->begin->tok.kind == TokOp && toks->begin->tok.Op == OpEOF)
 			break;
 		TRY_RET_ELSE(stmt(&ir, toks, &funcs, &global_scope, toks->begin), ir,

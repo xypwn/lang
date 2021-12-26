@@ -10,13 +10,12 @@ if (!(op == "+" || op == "-" || op == "*" || op == "/")) {
 	n2 := float(getln())
 
 	put("Result: ")
-	if (op == "+") {
+	if (op == "+")
 		putln(n1 + n2)
-	} else if (op == "-") {
+	else if (op == "-")
 		putln(n1 - n2)
-	} else if (op == "*") {
+	else if (op == "*")
 		putln(n1 * n2)
-	} else if (op == "/") {
+	else if (op == "/")
 		putln(n1 / n2)
-	}
 }

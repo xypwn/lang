@@ -65,19 +65,18 @@ while y < height {
 			it = it + 1
 		}
 
-		if it <= iterations / 5 {
+		if it <= iterations / 5
 			put(' ')
-		} else if it <= iterations / 5 * 2 {
+		else if it <= iterations / 5 * 2
 			put('.')
-		} else if it <= iterations / 5 * 3 {
+		else if it <= iterations / 5 * 3
 			put(',')
-		} else if it <= iterations / 5 * 4 {
+		else if it <= iterations / 5 * 4
 			put('*')
-		} else if it < iterations {
+		else if it < iterations
 			put('+')
-		} else if it == iterations {
+		else if it == iterations
 			put('#')
-		}
 
 		x = x + 1
 	}
