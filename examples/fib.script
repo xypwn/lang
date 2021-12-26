@@ -7,6 +7,6 @@ while i {
 	z := x + y
 	y = x
 	x = z
-	print(z)
+	putln(z)
 	i = i - 1
 }

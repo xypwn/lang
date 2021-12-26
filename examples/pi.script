@@ -14,4 +14,4 @@ while k < iterations {
 }
 
 put("π ≈ ")
-print(sum)
+putln(sum)

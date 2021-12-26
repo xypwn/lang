@@ -38,7 +38,7 @@ static Value fn_put(Value *args) {
 	return (Value){0};
 }
 
-static Value fn_print(Value *args) {
+static Value fn_putln(Value *args) {
 	fn_put(args);
 	printf("\n");
 	return (Value){0};
@@ -152,7 +152,7 @@ int main(int argc, const char **argv) {
 	/* parse tokens into IR code */
 	BuiltinFunc funcs[] = {
 		{ .name = "put",   .side_effects = true,  .n_args = 1, .func = fn_put,   },
-		{ .name = "print", .side_effects = true,  .n_args = 1, .func = fn_print, },
+		{ .name = "putln", .side_effects = true,  .n_args = 1, .func = fn_putln, },
 		{ .name = "int",   .side_effects = false, .n_args = 1, .func = fn_int,   },
 		{ .name = "float", .side_effects = false, .n_args = 1, .func = fn_float, },
 		{ .name = "pow",   .side_effects = false, .n_args = 2, .func = fn_pow,   },
