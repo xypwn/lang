@@ -22,7 +22,7 @@ Value eval_binary(IRInstr instr, const Value *lhs, const Value *rhs) {
 					.Int = res,
 				};
 			} else if (lhs->type.kind == TypeFloat && rhs->type.kind == TypeFloat) {
-				float res;
+				double res;
 				switch (instr) {
 					case IRAdd: res = lhs->Float + rhs->Float; break;
 					case IRSub: res = lhs->Float - rhs->Float; break;
