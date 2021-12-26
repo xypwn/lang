@@ -1,0 +1,22 @@
+put("Enter an operation (+, -, *, /): ")
+op := getln()
+if (!(op == "+" || op == "-" || op == "*" || op == "/")) {
+	put("Unknown operation: ")
+	putln(op)
+} else {
+	put("1st number: ")
+	n1 := float(getln())
+	put("2nd number: ")
+	n2 := float(getln())
+
+	put("Result: ")
+	if (op == "+") {
+		putln(n1 + n2)
+	} else if (op == "-") {
+		putln(n1 - n2)
+	} else if (op == "*") {
+		putln(n1 * n2)
+	} else if (op == "/") {
+		putln(n1 / n2)
+	}
+}

@@ -57,6 +57,16 @@ Value eval_binary(IRInstr instr, const Value *lhs, const Value *rhs) {
 					case IRLe: res = lhs->Float <= rhs->Float; break;
 					default: ASSERT_UNREACHED();
 				};
+			} else if (lhs->type.kind == TypeArr && lhs->Arr.type.kind == TypeChar && lhs->Arr.is_string &&
+					rhs->type.kind == TypeArr && rhs->Arr.type.kind == TypeChar && rhs->Arr.is_string) {
+				switch (instr) {
+					case IREq:
+						res = lhs->Arr.len == rhs->Arr.len ? strncmp(lhs->Arr.vals, rhs->Arr.vals, lhs->Arr.len) == 0 : false;
+						break;
+					default:
+						set_err("String operation '%s' not supported", irinstr_str[instr]);
+						break;
+				};
 			} else {
 				set_err("Unsupported types for operation '%s': %s and %s", irinstr_str[instr], type_str[lhs->type.kind], type_str[rhs->type.kind]);
 				return (Value){0};

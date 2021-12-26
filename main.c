@@ -53,6 +53,18 @@ static Value fn_int(Value *args) {
 		case TypeVoid: break;
 		case TypeFloat: ret.Int = (ssize_t)args[0].Float; break;
 		case TypeInt:   ret.Int = args[0].Int;            break;
+		case TypeBool:  ret.Int = (ssize_t)args[0].Bool;  break;
+		case TypeArr:
+			if (args[0].Arr.is_string && args[0].Arr.type.kind == TypeChar) {
+				ssize_t endpos;
+				ret.Int = stoimax((char*)args[0].Arr.vals, args[0].Arr.len, 10, &endpos);
+				if (endpos != -1) {
+					set_err("Error converting from string to int");
+					return (Value){0};
+				}
+			} else
+				ASSERT_UNREACHED();
+			break;
 		default: ASSERT_UNREACHED();
 	}
 	return ret;
@@ -65,8 +77,20 @@ static Value fn_float(Value *args) {
 	};
 	switch (args[0].type.kind) {
 		case TypeVoid: break;
-		case TypeFloat: ret.Float = args[0].Float;       break;
-		case TypeInt:   ret.Float = (double)args[0].Int; break;
+		case TypeFloat: ret.Float = args[0].Float;        break;
+		case TypeInt:   ret.Float = (double)args[0].Int;  break;
+		case TypeBool:  ret.Float = (double)args[0].Bool; break;
+		case TypeArr:
+			if (args[0].Arr.is_string && args[0].Arr.type.kind == TypeChar) {
+				ssize_t endpos;
+				ret.Float = stod((char*)args[0].Arr.vals, args[0].Arr.len, &endpos);
+				if (endpos != -1) {
+					set_err("Error converting from string to float");
+					return (Value){0};
+				}
+			} else
+				ASSERT_UNREACHED();
+			break;
 		default: ASSERT_UNREACHED();
 	}
 	return ret;
@@ -90,6 +114,34 @@ static Value fn_sleep(Value *args) {
 	}
 	sleep_secs(args[0].Float);
 	return (Value){0};
+}
+
+static Value fn_getln(Value *args) {
+	(void)args;
+
+	char *line = xmalloc(64);
+	size_t len = 0, cap = 64;
+	for (;;) {
+		int c = fgetc(stdin);
+		if (c == EOF)
+			break;
+		else if (c == '\n')
+			break;
+		if (len+1 > cap)
+			line = xrealloc(line, (cap *= 2));
+		line[len++] = c;
+	}
+
+	return (Value){
+		.type.kind = TypeArr,
+		.Arr = {
+			.is_string = true,
+			.type.kind = TypeChar,
+			.vals = line,
+			.len = len,
+			.cap = cap,
+		},
+	};
 }
 
 int main(int argc, const char **argv) {
@@ -157,6 +209,7 @@ int main(int argc, const char **argv) {
 		{ .name = "float", .side_effects = false, .n_args = 1, .func = fn_float, },
 		{ .name = "pow",   .side_effects = false, .n_args = 2, .func = fn_pow,   },
 		{ .name = "sleep", .side_effects = true,  .n_args = 1, .func = fn_sleep, },
+		{ .name = "getln", .side_effects = true,  .n_args = 0, .func = fn_getln, },
 	};
 	IRToks ir = parse(&tokens, funcs, sizeof(funcs) / sizeof(funcs[0]));
 	if (err) {
