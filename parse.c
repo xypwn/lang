@@ -32,6 +32,7 @@ static size_t get_ident_addr(const Scope *sc, const char *name, const Tok *errpo
 static IRParam tok_to_irparam(Scope *sc, Tok *t);
 static Scope make_scope(Scope *parent, bool with_idents);
 static void term_scope(Scope *sc);
+static bool expr_flush_ir_and_maybe_return(IRToks *out_ir, TokList *toks, IRTok instr, TokListItem *expr_start, Scope *expr_scope, TokListItem *t, ExprRet *out_ret);
 static ExprRet expr(IRToks *out_ir, TokList *toks, Map *funcs, Scope *parent_sc, TokListItem *t);
 static void expr_into_addr(IRToks *out_ir, TokList *toks, Map *funcs, Scope *parent_sc, TokListItem *t, size_t addr);
 static IRParam expr_into_irparam(IRToks *out_ir, TokList *toks, Map *funcs, Scope *parent_sc, TokListItem *t);
@@ -120,6 +121,43 @@ static Scope make_scope(Scope *parent, bool with_idents) {
 static void term_scope(Scope *sc) {
 	if (sc->has_idents)
 		map_term(&sc->ident_addrs);
+}
+
+/* If ir_tok is the underlying expr() call's last evaluation, this function
+ * deletes t from toks, sets *out_ret and tells the caller it can return
+ * *out_ret by returning true.
+ *
+ * If ir_tok is not the expression's last instruction, ir_tok is written to
+ * out_ir and t is replaced by a pointer to the result's memory address.
+ *  */
+static bool expr_flush_ir_and_maybe_return(IRToks *out_ir, TokList *toks, IRTok ir_tok, TokListItem *expr_start, Scope *expr_scope, TokListItem *t, ExprRet *out_ret) {
+	if (t == expr_start && t->next->tok.kind == TokOp && op_prec[t->next->tok.Op] == PREC_DELIM) {
+		/* ir_tok was the expression's last IR instruction. */
+
+		toklist_del(toks, t, t);
+
+		*out_ret = (ExprRet){
+			.kind = ExprRetLastInstr,
+			.LastInstr = ir_tok,
+		};
+		return true;
+	} else {
+		/* ir_tok was not the expression's last IR instruction. */
+
+		size_t dest_addr = expr_scope->mem_addr++;
+
+		set_irtok_dest_addr(&ir_tok, dest_addr);
+		irtoks_app(out_ir, ir_tok);
+
+		t->tok = (Tok){
+			.kind = TokIdent,
+			.Ident = {
+				.kind = IdentAddr,
+				.Addr = dest_addr,
+			},
+		};
+		return false;
+	}
 }
 
 /* The job of this function is to reduce the expression to the most simple form
@@ -226,6 +264,7 @@ static ExprRet expr(IRToks *out_ir, TokList *toks, Map *funcs, Scope *parent_sc,
 				ASSERT_UNREACHED();
 			toklist_del(toks, t->next, t->next);
 		}
+
 		/* Collapse function call. */
 		else if (t->tok.kind == TokIdent && t->tok.Ident.kind == IdentName && t->next->tok.kind == TokOp && t->next->tok.Op == OpLParen) {
 			/* get function */
@@ -303,39 +342,22 @@ static ExprRet expr(IRToks *out_ir, TokList *toks, Map *funcs, Scope *parent_sc,
 				if (args)
 					free(args);
 			} else {
-				bool is_last_operation = t == start && t->next->tok.kind == TokOp && op_prec[t->next->tok.Op] == PREC_DELIM;
-
-				size_t res_addr = is_last_operation ? 0 : sc.mem_addr++;
-
-				/* function call instruction */
-				IRTok ir = {
+				/* function call IR instruction */
+				IRTok ir_tok = {
 					.ln =  func_ident->tok.ln,
 					.col = func_ident->tok.col,
 					.instr = IRCallInternal,
 					.CallI = {
-						.ret_addr = res_addr,
+						.ret_addr = 0,
 						.fid = func.fid,
 						.args = args,
 					},
 				};
 
-				if (is_last_operation) {
-					/* done */
-					toklist_del(toks, t, t);
-					return (ExprRet){ .kind = ExprRetLastInstr, .LastInstr = ir };
-				} else {
-					/* write IR instruction */
-					irtoks_app(out_ir, ir);
-
-					/* leave new memory address as result */
-					t->tok = (Tok){
-						.kind = TokIdent,
-						.Ident = {
-							.kind = IdentAddr,
-							.Addr = res_addr,
-						},
-					};
-				}
+				/* return if we've just evaluated the last instruction */
+				ExprRet ret;
+				if (expr_flush_ir_and_maybe_return(out_ir, toks, ir_tok, start, &sc, func_ident, &ret))
+					return ret;
 			}
 		}
 
@@ -345,44 +367,29 @@ static ExprRet expr(IRToks *out_ir, TokList *toks, Map *funcs, Scope *parent_sc,
 			t = t->prev; /* go back to the '-' sign */
 			toklist_del(toks, t->next, t->next); /* again, just removing the reference */
 
-			bool is_last_operation = t == start && t->next->tok.kind == TokOp && op_prec[t->next->tok.Op] == PREC_DELIM;
-
 			if (v->kind == TokVal) {
 				/* immediately perform operation */
 				t->tok.kind = TokVal;
 				mark_err(&t->tok);
 				TRY_RET(t->tok.Val = eval_unary(unary_op, &v->Val), (ExprRet){0});
 			} else {
-				size_t res_addr = is_last_operation ? 0 : sc.mem_addr++;
-
 				/* unary IR instruction */
 				IRParam v_irparam;
 				TRY_RET(v_irparam = tok_to_irparam(&sc, v), (ExprRet){0});
-				IRTok ir = {
+				IRTok ir_tok = {
 					.ln = t->tok.ln,
 					.col = t->tok.col,
 					.instr = unary_op,
 					.Unary = {
-						.addr = res_addr,
+						.addr = 0,
 						.val = v_irparam,
 					},
 				};
 
-				if (is_last_operation) {
-					/* done */
-					toklist_del(toks, t, t);
-					return (ExprRet){ .kind = ExprRetLastInstr, .LastInstr = ir };
-				} else {
-					/* write IR instruction */
-					irtoks_app(out_ir, ir);
-
-					/* leave new memory address as result */
-					t->tok.kind = TokIdent;
-					t->tok.Ident = (Identifier){
-						.kind = IdentAddr,
-						.Addr = res_addr,
-					};
-				}
+				/* return if we've just evaluated the last instruction */
+				ExprRet ret;
+				if (expr_flush_ir_and_maybe_return(out_ir, toks, ir_tok, start, &sc, t, &ret))
+					return ret;
 			}
 		}
 
@@ -479,40 +486,26 @@ static ExprRet expr(IRToks *out_ir, TokList *toks, Map *funcs, Scope *parent_sc,
 				mark_err(l_op);
 				TRY_RET(lhs->Val = eval_binary(instr, lhs_val, rhs_val), (ExprRet){0});
 			} else {
-				bool is_last_operation = t == start && r_op_prec == PREC_DELIM;
-
 				IRParam lhs_irparam, rhs_irparam;
 				TRY_RET(lhs_irparam = tok_to_irparam(&sc, lhs), (ExprRet){0});
 				TRY_RET(rhs_irparam = tok_to_irparam(&sc, rhs), (ExprRet){0});
 
-				size_t res_addr = is_last_operation ? 0 : sc.mem_addr++;
-
-				IRTok ir = {
+				/* binary IR instruction */
+				IRTok ir_tok = {
 					.ln = l_op->ln,
 					.col = l_op->col,
 					.instr = instr,
 					.Binary = {
-						.addr = res_addr,
+						.addr = 0,
 						.lhs = swap_operands ? rhs_irparam : lhs_irparam,
 						.rhs = swap_operands ? lhs_irparam : rhs_irparam,
 					},
 				};
-				
-				if (is_last_operation) {
-					/* done */
-					toklist_del(toks, t, t);
-					return (ExprRet){ .kind = ExprRetLastInstr, .LastInstr = ir };
-				} else {
-					/* write IR instruction */
-					irtoks_app(out_ir, ir);
 
-					/* leave new memory address as result */
-					lhs->kind = TokIdent;
-					lhs->Ident = (Identifier){
-						.kind = IdentAddr,
-						.Addr = res_addr,
-					};
-				}
+				/* return if we've just evaluated the last instruction */
+				ExprRet ret;
+				if (expr_flush_ir_and_maybe_return(out_ir, toks, ir_tok, start, &sc, t, &ret))
+					return ret;
 			}
 		}
 	}
