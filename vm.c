@@ -70,7 +70,7 @@ void run(const IRToks *ir, const BuiltinFunc *builtin_funcs) {
 					.type = TypePtr,
 					.Ptr = {
 						.type = v->type,
-						.val = v,
+						.val = &v->Void,
 					},
 				};
 				break;

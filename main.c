@@ -8,6 +8,7 @@
 #include "ir.h"
 #include "lex.h"
 #include "parse.h"
+#include "runtime.h"
 #include "util.h"
 #include "vm.h"
 
@@ -53,10 +54,11 @@ static Value fn_int(Value *args) {
 		.Int = 0,
 	};
 	switch (args[0].type) {
-		case TypeVoid: break;
+		case TypeVoid:  break;
 		case TypeFloat: ret.Int = (ssize_t)args[0].Float; break;
 		case TypeInt:   ret.Int = args[0].Int;            break;
 		case TypeBool:  ret.Int = (ssize_t)args[0].Bool;  break;
+		case TypeChar:  ret.Int = (ssize_t)args[0].Char;  break;
 		case TypeArr:
 			if (args[0].Arr.is_string && args[0].Arr.type == TypeChar) {
 				ssize_t endpos;
@@ -79,10 +81,11 @@ static Value fn_float(Value *args) {
 		.Float = 0.0,
 	};
 	switch (args[0].type) {
-		case TypeVoid: break;
+		case TypeVoid:  break;
 		case TypeFloat: ret.Float = args[0].Float;        break;
 		case TypeInt:   ret.Float = (double)args[0].Int;  break;
 		case TypeBool:  ret.Float = (double)args[0].Bool; break;
+		case TypeChar:  ret.Float = (double)args[0].Char; break;
 		case TypeArr:
 			if (args[0].Arr.is_string && args[0].Arr.type == TypeChar) {
 				ssize_t endpos;
@@ -97,6 +100,31 @@ static Value fn_float(Value *args) {
 		default: ASSERT_UNREACHED();
 	}
 	return ret;
+}
+
+static Value fn_bool(Value *args) {
+	return (Value){ .type = TypeBool, .Bool = is_nonzero(&args[0]) };
+}
+
+static Value fn_char(Value *args) {
+	Value ret = {
+		.type = TypeChar,
+		.Float = 0.0,
+	};
+	switch (args[0].type) {
+		case TypeVoid:  break;
+		case TypeFloat: ret.Char = (char)args[0].Float; break;
+		case TypeInt:   ret.Char = (char)args[0].Int;   break;
+		case TypeBool:  ret.Char = (char)args[0].Bool;  break;
+		case TypeChar:  ret.Char = args[0].Char;        break;
+		default: ASSERT_UNREACHED();
+	}
+	return ret;
+}
+
+static Value fn_ptr(Value *args) {
+	(void)args;
+	return (Value){ .type = TypePtr, .Ptr = { .type = TypeVoid, .val = NULL }};
 }
 
 static Value fn_pow(Value *args) {
@@ -209,6 +237,9 @@ int main(int argc, const char **argv) {
 		{ .name = "putln", .kind = FuncVarArgs,   .returns = false, .side_effects = true,  .VarArgs   = { .min_args = 0, .NoRet.func   = fn_putln, }},
 		{ .name = "int",   .kind = FuncFixedArgs, .returns = true,  .side_effects = false, .FixedArgs = { .n_args = 1,   .WithRet.func = fn_int,   }},
 		{ .name = "float", .kind = FuncFixedArgs, .returns = true,  .side_effects = false, .FixedArgs = { .n_args = 1,   .WithRet.func = fn_float, }},
+		{ .name = "bool",  .kind = FuncFixedArgs, .returns = true,  .side_effects = false, .FixedArgs = { .n_args = 1,   .WithRet.func = fn_bool,  }},
+		{ .name = "char",  .kind = FuncFixedArgs, .returns = true,  .side_effects = false, .FixedArgs = { .n_args = 1,   .WithRet.func = fn_char,  }},
+		{ .name = "ptr",   .kind = FuncFixedArgs, .returns = true,  .side_effects = false, .FixedArgs = { .n_args = 0,   .WithRet.func = fn_ptr,   }},
 		{ .name = "pow",   .kind = FuncFixedArgs, .returns = true,  .side_effects = false, .FixedArgs = { .n_args = 2,   .WithRet.func = fn_pow,   }},
 		{ .name = "sleep", .kind = FuncFixedArgs, .returns = false, .side_effects = true,  .FixedArgs = { .n_args = 1,   .NoRet.func   = fn_sleep, }},
 		{ .name = "getln", .kind = FuncFixedArgs, .returns = true,  .side_effects = true,  .FixedArgs = { .n_args = 0,   .WithRet.func = fn_getln, }},

@@ -11,6 +11,7 @@ size_t type_size[TypeEnumSize] = {
 	[TypeInt]   = sizeof(((Value*)NULL)->Int),
 	[TypeBool]  = sizeof(((Value*)NULL)->Bool),
 	[TypeChar]  = sizeof(((Value*)NULL)->Char),
+	[TypePtr]   = sizeof(((Value*)NULL)->Ptr),
 	[TypeArr]   = sizeof(((Value*)NULL)->Arr),
 };
 
@@ -47,11 +48,17 @@ void print_value(const Value *v, bool raw) {
 				else     printf("'%c'", v->Char);
 			}
 			break;
-		case TypePtr:
-			printf("ptr<%s>(", type_str[v->Ptr.type]);
-			print_value(v->Ptr.val, false);
-			printf(")");
+		case TypePtr: {
+			if (v->Ptr.val) {
+				printf("ptr<%s>(", type_str[v->Ptr.type]);
+				Value deref = { .type = v->Ptr.type };
+				memcpy(&deref.Void, v->Ptr.val, type_size[v->Ptr.type]);
+				print_value(&deref, false);
+				printf(")");
+			} else
+				printf("ptr<%s>(nil)", type_str[v->Ptr.type]);
 			break;
+		}
 		case TypeArr:
 			if (v->Arr.is_string) {
 				if (v->Arr.type != TypeChar)

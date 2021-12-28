@@ -130,9 +130,12 @@ Value eval_unary(IRInstr instr, const Value *v) {
 
 bool is_nonzero(const Value *v) {
 	switch (v->type) {
-		case TypeInt:   return v->Int   != 0;
-		case TypeFloat: return v->Float != 0.0;
+		case TypeInt:   return v->Int     != 0;
+		case TypeFloat: return v->Float   != 0.0;
 		case TypeBool:  return v->Bool;
+		case TypeChar:  return v->Char    != 0;
+		case TypePtr:   return v->Ptr.val != NULL;
+		case TypeArr:   return v->Arr.len != 0;
 		default: ASSERT_UNREACHED();
 	}
 }

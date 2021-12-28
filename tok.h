@@ -31,7 +31,7 @@ typedef struct Value {
 		char Char;
 		struct {
 			Type type;
-			struct Value *val;
+			void *val;
 		} Ptr;
 		struct {
 			Type type;
