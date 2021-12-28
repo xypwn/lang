@@ -49,16 +49,16 @@ static void fn_putln(size_t extra_args, Value *args) {
 
 static Value fn_int(Value *args) {
 	Value ret = {
-		.type.kind = TypeInt,
+		.type = TypeInt,
 		.Int = 0,
 	};
-	switch (args[0].type.kind) {
+	switch (args[0].type) {
 		case TypeVoid: break;
 		case TypeFloat: ret.Int = (ssize_t)args[0].Float; break;
 		case TypeInt:   ret.Int = args[0].Int;            break;
 		case TypeBool:  ret.Int = (ssize_t)args[0].Bool;  break;
 		case TypeArr:
-			if (args[0].Arr.is_string && args[0].Arr.type.kind == TypeChar) {
+			if (args[0].Arr.is_string && args[0].Arr.type == TypeChar) {
 				ssize_t endpos;
 				ret.Int = stoimax((char*)args[0].Arr.vals, args[0].Arr.len, 10, &endpos);
 				if (endpos != -1) {
@@ -75,16 +75,16 @@ static Value fn_int(Value *args) {
 
 static Value fn_float(Value *args) {
 	Value ret = {
-		.type.kind = TypeFloat,
+		.type = TypeFloat,
 		.Float = 0.0,
 	};
-	switch (args[0].type.kind) {
+	switch (args[0].type) {
 		case TypeVoid: break;
 		case TypeFloat: ret.Float = args[0].Float;        break;
 		case TypeInt:   ret.Float = (double)args[0].Int;  break;
 		case TypeBool:  ret.Float = (double)args[0].Bool; break;
 		case TypeArr:
-			if (args[0].Arr.is_string && args[0].Arr.type.kind == TypeChar) {
+			if (args[0].Arr.is_string && args[0].Arr.type == TypeChar) {
 				ssize_t endpos;
 				ret.Float = stod((char*)args[0].Arr.vals, args[0].Arr.len, &endpos);
 				if (endpos != -1) {
@@ -100,18 +100,18 @@ static Value fn_float(Value *args) {
 }
 
 static Value fn_pow(Value *args) {
-	if (!(args[0].type.kind == TypeFloat && args[1].type.kind == TypeFloat)) {
+	if (!(args[0].type == TypeFloat && args[1].type == TypeFloat)) {
 		set_err("pow() requires arguments of type float");
 		return (Value){0};
 	}
 	return (Value){
-		.type.kind = TypeFloat,
+		.type = TypeFloat,
 		.Float = pow(args[0].Float, args[1].Float),
 	};
 }
 
 static void fn_sleep(Value *args) {
-	if (!(args[0].type.kind == TypeFloat && args[0].Float >= 0.0)) {
+	if (!(args[0].type == TypeFloat && args[0].Float >= 0.0)) {
 		set_err("sleep() requires a positive float");
 		return;
 	}
@@ -135,10 +135,10 @@ static Value fn_getln(Value *args) {
 	}
 
 	return (Value){
-		.type.kind = TypeArr,
+		.type = TypeArr,
 		.Arr = {
 			.is_string = true,
-			.type.kind = TypeChar,
+			.type = TypeChar,
 			.vals = line,
 			.len = len,
 			.cap = cap,

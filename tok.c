@@ -25,7 +25,7 @@ const char *type_str[TypeEnumSize] = {
 };
 
 void print_value(const Value *v, bool raw) {
-	switch (v->type.kind) {
+	switch (v->type) {
 		case TypeVoid:
 			printf("(void)");
 			break;
@@ -48,13 +48,13 @@ void print_value(const Value *v, bool raw) {
 			}
 			break;
 		case TypePtr:
-			printf("ptr<%s>(", type_str[v->Ptr.type.kind]);
+			printf("ptr<%s>(", type_str[v->Ptr.type]);
 			print_value(v->Ptr.val, false);
 			printf(")");
 			break;
 		case TypeArr:
 			if (v->Arr.is_string) {
-				if (v->Arr.type.kind != TypeChar)
+				if (v->Arr.type != TypeChar)
 					ASSERT_UNREACHED();
 				char *str = v->Arr.vals;
 				if (!raw)
@@ -74,7 +74,7 @@ void print_value(const Value *v, bool raw) {
 			} else {
 				printf("[");
 				for (size_t i = 0;; i++) {
-					size_t ty_sz = type_size[v->Arr.type.kind];
+					size_t ty_sz = type_size[v->Arr.type];
 					Value ty_val = { .type = v->Arr.type };
 					memcpy(&ty_val.Void, (uint8_t*)v->Arr.vals + ty_sz * i, ty_sz);
 					print_value(&ty_val, false);

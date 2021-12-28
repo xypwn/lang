@@ -67,9 +67,9 @@ void run(const IRToks *ir, const BuiltinFunc *builtin_funcs) {
 				}
 				Value *v = &s.mem[instr->Unary.val.Addr];
 				s.mem[instr->Unary.addr] = (Value){
-					.type.kind = TypePtr,
+					.type = TypePtr,
 					.Ptr = {
-						.type.kind = v->type.kind,
+						.type = v->type,
 						.val = v,
 					},
 				};

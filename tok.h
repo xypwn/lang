@@ -5,21 +5,17 @@
 
 #include "util.h"
 
-typedef struct Type {
-	enum {
-		TypeVoid = 0,
-		TypeFloat,
-		TypeInt,
-		TypeBool,
-		TypeChar,
-		TypePtr,
-		TypeArr,
-		TypeEnumSize,
-	} kind;
-
-	/*union {
-	};*/
-} Type;
+enum Type {
+	TypeVoid = 0,
+	TypeFloat,
+	TypeInt,
+	TypeBool,
+	TypeChar,
+	TypePtr,
+	TypeArr,
+	TypeEnumSize,
+};
+typedef enum Type Type;
 
 extern size_t type_size[TypeEnumSize];
 extern const char *type_str[TypeEnumSize];
@@ -38,8 +34,8 @@ typedef struct Value {
 			struct Value *val;
 		} Ptr;
 		struct {
-			bool is_string : 1;
 			Type type;
+			bool is_string : 1;
 			void *vals;
 			size_t len, cap;
 		} Arr;

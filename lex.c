@@ -81,9 +81,9 @@ TokList lex(const char *s, Pool *static_vars) {
 			else if (streq_0_n("while", start, i))
 				emit(&toks, &pos, (Tok){ .kind = TokWhile });
 			else if (streq_0_n("true", start, i))
-				emit(&toks, &pos, (Tok){ .kind = TokVal, .Val = { .type = { .kind = TypeBool, }, .Bool = true, }, });
+				emit(&toks, &pos, (Tok){ .kind = TokVal, .Val = { .type = TypeBool, .Bool = true }});
 			else if (streq_0_n("false", start, i))
-				emit(&toks, &pos, (Tok){ .kind = TokVal, .Val = { .type = { .kind = TypeBool, }, .Bool = false, }, });
+				emit(&toks, &pos, (Tok){ .kind = TokVal, .Val = { .type = TypeBool, .Bool = false }});
 			else {
 				emit(&toks, &pos, (Tok){
 						.kind = TokIdent,
@@ -146,9 +146,7 @@ TokList lex(const char *s, Pool *static_vars) {
 				emit(&toks, &pos, (Tok){
 						.kind = TokVal,
 						.Val = {
-							.type = {
-								.kind = TypeFloat,
-							},
+							.type = TypeFloat,
 							.Float = num,
 						},
 					});
@@ -164,9 +162,7 @@ TokList lex(const char *s, Pool *static_vars) {
 				emit(&toks, &pos, (Tok){
 						.kind = TokVal,
 						.Val = {
-							.type = {
-								.kind = TypeInt,
-							},
+							.type = TypeInt,
 							.Int = num,
 						},
 					});
@@ -234,9 +230,9 @@ TokList lex(const char *s, Pool *static_vars) {
 			case '!':
 				consume(&pos, *(s++));
 				if (s[0] == '=')
-					emit(&toks, &pos, (Tok){ .kind = TokOp, .Op = OpNeq, });
+					emit(&toks, &pos, (Tok){ .kind = TokOp, .Op = OpNeq });
 				else {
-					emit(&toks, &pos, (Tok){ .kind = TokOp, .Op = OpNot, });
+					emit(&toks, &pos, (Tok){ .kind = TokOp, .Op = OpNot });
 					continue;
 				}
 				break;
@@ -310,7 +306,7 @@ TokList lex(const char *s, Pool *static_vars) {
 					set_err("Unclosed char literal");
 					return toks;
 				}
-				emit(&toks, &pos, (Tok){ .kind = TokVal, .Val = { .type = { .kind = TypeChar, }, .Char = c, }, });
+				emit(&toks, &pos, (Tok){ .kind = TokVal, .Val = { .type = TypeChar, .Char = c }});
 				break;
 			}
 			case '"': {
@@ -348,10 +344,10 @@ TokList lex(const char *s, Pool *static_vars) {
 					str[i] = c;
 				}
 				emit(&toks, &pos, (Tok){ .kind = TokVal, .Val = {
-						.type.kind = TypeArr,
+						.type = TypeArr,
 						.Arr = {
 							.is_string = true,
-							.type.kind = TypeChar,
+							.type = TypeChar,
 							.vals = str,
 							.len = size,
 							.cap = size,
