@@ -143,7 +143,7 @@ void optimize_ir(IRToks *v) {
 			case IRJmp: {
 				/* resolve jump chains (esp. produced by if-else-if... statements) */
 				size_t ja = i;
-				while (v->toks[ja].instr == IRJmp)
+				while (ja < v->len && v->toks[ja].instr == IRJmp)
 					ja = v->toks[ja].Jmp.iaddr;
 				v->toks[i].Jmp.iaddr = ja;
 			}
