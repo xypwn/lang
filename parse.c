@@ -582,13 +582,13 @@ static void stmt(IRToks *out_ir, TokList *toks, Map *funcs, Scope *sc, TokListIt
 		t = t->next;
 		if (t->tok.kind == TokDeclare) {
 			size_t addr = sc->mem_addr++;
+			TRY(expr_into_addr(out_ir, toks, funcs, sc, t->next, addr));
 			bool replaced = map_insert(&sc->ident_addrs, name, &addr);
 			if (replaced) {
 				mark_err(&start->tok);
 				set_err("'%s' already declared in this scope", name);
 				return;
 			}
-			TRY(expr_into_addr(out_ir, toks, funcs, sc, t->next, addr));
 		} else if (t->tok.kind == TokAssign) {
 			size_t addr;
 			TRY(addr = get_ident_addr(sc, name, &start->tok));
