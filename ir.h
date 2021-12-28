@@ -4,11 +4,33 @@
 #include "tok.h"
 
 typedef struct BuiltinFunc {
-	char *name;
+	enum {
+		FuncFixedArgs,
+		FuncVarArgs,
+	} kind;
+
+	bool returns : 1;
 	bool side_effects : 1;
-	size_t n_args;
-	Value (*func)(Value *args);
+	char *name;
 	size_t fid; /* function ID, assigned automatically */
+
+	union {
+		struct {
+			size_t n_args;
+			union {
+				struct { Value (*func)(Value *args); } WithRet;
+				struct { void  (*func)(Value *args); } NoRet;
+			};
+		} FixedArgs;
+
+		struct {
+			size_t min_args;
+			union {
+				struct { Value (*func)(size_t extra_args, Value *args); } WithRet;
+				struct { void  (*func)(size_t extra_args, Value *args); } NoRet;
+			};
+		} VarArgs;
+	};
 } BuiltinFunc;
 
 enum IRInstr {
@@ -28,6 +50,7 @@ enum IRInstr {
 	IRJmp,
 	IRJnz,
 	IRCallInternal,
+	IRAddrOf,
 	IRInstrEnumSize,
 };
 typedef enum IRInstr IRInstr;
@@ -80,6 +103,7 @@ typedef struct IRTok {
 		struct {
 			size_t ret_addr;
 			size_t fid;
+			size_t n_args;
 			IRParam *args;
 		} CallI;
 	};

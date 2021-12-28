@@ -20,6 +20,7 @@ const char *irinstr_str[IRInstrEnumSize] = {
 	[IRJmp] = "jmp",
 	[IRJnz] = "jnz",
 	[IRCallInternal] = "calli",
+	[IRAddrOf] = "addrof",
 };
 
 #define IRTOKS_INIT_CAP_LONG 4096
@@ -91,6 +92,7 @@ void print_ir(IRToks *v, const BuiltinFunc *builtin_funcs) {
 			case IRSet:
 			case IRNeg:
 			case IRNot:
+			case IRAddrOf:
 				printf(" %%%zx ", v->toks[i].Unary.addr);
 				print_irparam(&v->toks[i].Unary.val);
 				break;
@@ -119,8 +121,10 @@ void print_ir(IRToks *v, const BuiltinFunc *builtin_funcs) {
 				break;
 			case IRCallInternal: {
 				const BuiltinFunc *f = &builtin_funcs[v->toks[i].CallI.fid];
-				printf(" %s %%%zx", f->name, v->toks[i].CallI.ret_addr);
-				for (size_t j = 0; j < f->n_args; j++) {
+				if (f->returns)
+					printf(" %%%zx", v->toks[i].CallI.ret_addr);
+				printf(" %s", f->name);
+				for (size_t j = 0; j < v->toks[i].CallI.n_args; j++) {
 					printf(" ");
 					print_irparam(&v->toks[i].CallI.args[j]);
 				}

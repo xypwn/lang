@@ -120,6 +120,9 @@ Value eval_unary(IRInstr instr, const Value *v) {
 				set_err("Unsupported type for operation '%s': %s", irinstr_str[instr], type_str[v->type.kind]);
 				return (Value){0};
 			}
+		case IRAddrOf:
+			set_err("Unable to take the address of a literal");
+			return (Value){0};
 		default:
 			ASSERT_UNREACHED();
 	}

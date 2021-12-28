@@ -2,7 +2,6 @@
 #define __TOK_H__
 
 #include <stdint.h>
-#include <unistd.h>
 
 #include "util.h"
 
@@ -13,6 +12,7 @@ typedef struct Type {
 		TypeInt,
 		TypeBool,
 		TypeChar,
+		TypePtr,
 		TypeArr,
 		TypeEnumSize,
 	} kind;
@@ -33,6 +33,10 @@ typedef struct Value {
 		ssize_t Int;
 		bool Bool;
 		char Char;
+		struct {
+			Type type;
+			struct Value *val;
+		} Ptr;
 		struct {
 			bool is_string : 1;
 			Type type;
@@ -55,6 +59,7 @@ enum Operator {
 	OpMul    = '*',
 	OpDiv    = '/',
 	OpNot    = '!',
+	OpAddrOf = '&',
 	OpBeginNonchars = 256,
 	OpEq,
 	OpNeq,

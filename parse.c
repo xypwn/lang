@@ -49,6 +49,7 @@ static void set_irtok_dest_addr(IRTok *t, size_t addr) {
 		case IRSet:
 		case IRNeg:
 		case IRNot:
+		case IRAddrOf:
 			t->Unary.addr = addr;
 			break;
 		case IRAdd:
@@ -230,6 +231,10 @@ static ExprRet expr(IRToks *out_ir, TokList *toks, Map *funcs, Scope *parent_sc,
 				t = t->next;
 				perform_unary = true;
 				unary_op = IRNot;
+			} else if (t->tok.Op == OpAddrOf) {
+				t = t->next;
+				perform_unary = true;
+				unary_op = IRAddrOf;
 			}
 		}
 
@@ -319,10 +324,17 @@ static ExprRet expr(IRToks *out_ir, TokList *toks, Map *funcs, Scope *parent_sc,
 			t = func_ident;
 			toklist_del(toks, t->next, t->next); /* delete left parenthesis */
 
-			if (func.n_args != args_len) {
+			if (func.kind == FuncFixedArgs && args_len != func.FixedArgs.n_args) {
 				mark_err(&func_ident->tok);
-				const char *plural = func.n_args == 1 ? "" : "s";
-				set_err("Function %s() takes %zu argument%s but got %zu", func.name, func.n_args, plural, args_len);
+				const char *plural = func.FixedArgs.n_args == 1 ? "" : "s";
+				set_err("Function %s() takes %zu argument%s but got %zu", func.name, func.FixedArgs.n_args, plural, args_len);
+				if (args)
+					free(args);
+				return (ExprRet){0};
+			} else if (func.kind == FuncVarArgs && args_len < func.VarArgs.min_args) {
+				mark_err(&func_ident->tok);
+				const char *plural = func.VarArgs.min_args == 1 ? "" : "s";
+				set_err("Function %s() requires at least %zu argument%s but only got %zu", func.name, func.VarArgs.min_args, plural, args_len);
 				if (args)
 					free(args);
 				return (ExprRet){0};
@@ -330,13 +342,20 @@ static ExprRet expr(IRToks *out_ir, TokList *toks, Map *funcs, Scope *parent_sc,
 
 			if (eval_func_in_place) {
 				/* evaluate the function in place */
+				if (!func.returns)
+					/* If the function had no side effects and returned nothing,
+					 * that function would do absolutely nothing, which would
+					 * make no sense. */
+					ASSERT_UNREACHED();
 				Value *arg_vals = args_len ? xmalloc(sizeof(Value) * args_len) : NULL;
 				for (size_t i = 0; i < args_len; i++)
 					arg_vals[i] = args[i].Literal;
 				mark_err(&func_ident->tok);
 				func_ident->tok = (Tok) {
 					.kind = TokVal,
-					.Val = func.func(arg_vals),
+					.Val = func.kind == FuncVarArgs ?
+						func.VarArgs.WithRet.func(args_len - func.VarArgs.min_args, arg_vals)
+						: func.FixedArgs.WithRet.func(arg_vals),
 				};
 				if (arg_vals)
 					free(arg_vals);
@@ -351,6 +370,7 @@ static ExprRet expr(IRToks *out_ir, TokList *toks, Map *funcs, Scope *parent_sc,
 					.CallI = {
 						.ret_addr = 0,
 						.fid = func.fid,
+						.n_args = args_len,
 						.args = args,
 					},
 				};

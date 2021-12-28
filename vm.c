@@ -60,6 +60,20 @@ void run(const IRToks *ir, const BuiltinFunc *builtin_funcs) {
 				TRY_ELSE(s.mem[instr->Unary.addr] = eval_unary(instr->instr, irparam_to_val(&s, &instr->Unary.val)),
 					{free(fn_args); stack_term(&s);});
 				break;
+			case IRAddrOf:
+				if (instr->Unary.val.kind != IRParamAddr) {
+					set_err("Unable to take the address of a literal");
+					return;
+				}
+				Value *v = &s.mem[instr->Unary.val.Addr];
+				s.mem[instr->Unary.addr] = (Value){
+					.type.kind = TypePtr,
+					.Ptr = {
+						.type.kind = v->type.kind,
+						.val = v,
+					},
+				};
+				break;
 			case IRAdd:
 			case IRSub:
 			case IRDiv:
@@ -87,16 +101,36 @@ void run(const IRToks *ir, const BuiltinFunc *builtin_funcs) {
 				break;
 			case IRCallInternal: {
 				const BuiltinFunc *f = &builtin_funcs[instr->CallI.fid];
+				size_t n_args = instr->CallI.n_args;
 				/* make sure enough space for our arguments is allocated */
-				if (f->n_args > fn_args_cap)
-					fn_args = xrealloc(fn_args, sizeof(Value) * (fn_args_cap = f->n_args));
+				if (n_args > fn_args_cap)
+					fn_args = xrealloc(fn_args, sizeof(Value) * (fn_args_cap = n_args));
 				/* copy arguments into buffer */
-				for (size_t i = 0; i < f->n_args; i++)
+				for (size_t i = 0; i < n_args; i++)
 					fn_args[i] = *irparam_to_val(&s, &instr->CallI.args[i]);
 
-				stack_fit(&s, instr->CallI.ret_addr);
-				TRY_ELSE(s.mem[instr->CallI.ret_addr] = f->func(fn_args),
-					{free(fn_args); stack_term(&s);});
+				if (f->returns) {
+					stack_fit(&s, instr->CallI.ret_addr);
+					if (f->kind == FuncVarArgs) {
+						size_t min_args = f->VarArgs.min_args;
+						TRY_ELSE(s.mem[instr->CallI.ret_addr] = f->VarArgs.WithRet.func(n_args - min_args, fn_args),
+							{free(fn_args); stack_term(&s);});
+					} else if (f->kind == FuncFixedArgs) {
+						TRY_ELSE(s.mem[instr->CallI.ret_addr] = f->FixedArgs.WithRet.func(fn_args),
+							{free(fn_args); stack_term(&s);});
+					} else
+						ASSERT_UNREACHED();
+				} else {
+					if (f->kind == FuncVarArgs) {
+						size_t min_args = f->VarArgs.min_args;
+						TRY_ELSE(f->VarArgs.NoRet.func(n_args - min_args, fn_args),
+							{free(fn_args); stack_term(&s);});
+					} else if (f->kind == FuncFixedArgs) {
+						TRY_ELSE(f->FixedArgs.NoRet.func(fn_args),
+							{free(fn_args); stack_term(&s);});
+					} else
+						ASSERT_UNREACHED();
+				}
 				break;
 			}
 			default:

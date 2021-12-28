@@ -20,6 +20,7 @@ const char *type_str[TypeEnumSize] = {
 	[TypeInt]   = "int",
 	[TypeBool]  = "bool",
 	[TypeChar]  = "char",
+	[TypePtr]   = "ptr",
 	[TypeArr]   = "arr",
 };
 
@@ -45,6 +46,11 @@ void print_value(const Value *v, bool raw) {
 				if (esc) printf("'%s'", esc);
 				else     printf("'%c'", v->Char);
 			}
+			break;
+		case TypePtr:
+			printf("ptr<%s>(", type_str[v->Ptr.type.kind]);
+			print_value(v->Ptr.val, false);
+			printf(")");
 			break;
 		case TypeArr:
 			if (v->Arr.is_string) {
@@ -72,7 +78,7 @@ void print_value(const Value *v, bool raw) {
 					Value ty_val = { .type = v->Arr.type };
 					memcpy(&ty_val.Void, (uint8_t*)v->Arr.vals + ty_sz * i, ty_sz);
 					print_value(&ty_val, false);
-					if (i == v->Arr.len-1) break;
+					if (i+1 >= v->Arr.len) break;
 					printf(", ");
 				}
 				printf("]");

@@ -33,15 +33,18 @@ static void die(const char *fmt, ...) {
 	exit(1);
 }
 
-static Value fn_put(Value *args) {
-	print_value(&args[0], true);
-	return (Value){0};
+static void fn_put(size_t extra_args, Value *args) {
+	for (size_t i = 0;; i++) {
+		print_value(&args[i], true);
+		if (i+1 >= extra_args)
+			break;
+		printf(" ");
+	}
 }
 
-static Value fn_putln(Value *args) {
-	fn_put(args);
+static void fn_putln(size_t extra_args, Value *args) {
+	fn_put(extra_args, args);
 	printf("\n");
-	return (Value){0};
 }
 
 static Value fn_int(Value *args) {
@@ -107,13 +110,12 @@ static Value fn_pow(Value *args) {
 	};
 }
 
-static Value fn_sleep(Value *args) {
+static void fn_sleep(Value *args) {
 	if (!(args[0].type.kind == TypeFloat && args[0].Float >= 0.0)) {
 		set_err("sleep() requires a positive float");
-		return (Value){0};
+		return;
 	}
 	sleep_secs(args[0].Float);
-	return (Value){0};
 }
 
 static Value fn_getln(Value *args) {
@@ -203,13 +205,13 @@ int main(int argc, const char **argv) {
 		print_toks(&tokens);
 	/* parse tokens into IR code */
 	BuiltinFunc funcs[] = {
-		{ .name = "put",   .side_effects = true,  .n_args = 1, .func = fn_put,   },
-		{ .name = "putln", .side_effects = true,  .n_args = 1, .func = fn_putln, },
-		{ .name = "int",   .side_effects = false, .n_args = 1, .func = fn_int,   },
-		{ .name = "float", .side_effects = false, .n_args = 1, .func = fn_float, },
-		{ .name = "pow",   .side_effects = false, .n_args = 2, .func = fn_pow,   },
-		{ .name = "sleep", .side_effects = true,  .n_args = 1, .func = fn_sleep, },
-		{ .name = "getln", .side_effects = true,  .n_args = 0, .func = fn_getln, },
+		{ .name = "put",   .kind = FuncVarArgs,   .returns = false, .side_effects = true,  .VarArgs   = { .min_args = 0, .NoRet.func   = fn_put,   }},
+		{ .name = "putln", .kind = FuncVarArgs,   .returns = false, .side_effects = true,  .VarArgs   = { .min_args = 0, .NoRet.func   = fn_putln, }},
+		{ .name = "int",   .kind = FuncFixedArgs, .returns = true,  .side_effects = false, .FixedArgs = { .n_args = 1,   .WithRet.func = fn_int,   }},
+		{ .name = "float", .kind = FuncFixedArgs, .returns = true,  .side_effects = false, .FixedArgs = { .n_args = 1,   .WithRet.func = fn_float, }},
+		{ .name = "pow",   .kind = FuncFixedArgs, .returns = true,  .side_effects = false, .FixedArgs = { .n_args = 2,   .WithRet.func = fn_pow,   }},
+		{ .name = "sleep", .kind = FuncFixedArgs, .returns = false, .side_effects = true,  .FixedArgs = { .n_args = 1,   .NoRet.func   = fn_sleep, }},
+		{ .name = "getln", .kind = FuncFixedArgs, .returns = true,  .side_effects = true,  .FixedArgs = { .n_args = 0,   .WithRet.func = fn_getln, }},
 	};
 	IRToks ir = parse(&tokens, funcs, sizeof(funcs) / sizeof(funcs[0]));
 	if (err) {
