@@ -7,7 +7,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#ifdef WIN32
+#if defined(_WIN32) || defined(WIN32)
 #include <windows.h> /* SSIZE_T */
 typedef SSIZE_T ssize_t;
 #else

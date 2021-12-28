@@ -9,7 +9,7 @@
 #endif
 
 void sleep_secs(double secs) {
-#ifdef WIN32
+#if defined(_WIN32) || defined(WIN32)
 	Sleep(secs * 1000.0);
 #else
 	struct timespec ts;
