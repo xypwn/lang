@@ -36,12 +36,14 @@ typedef struct Value {
 		struct {
 			Type type;
 			bool is_string : 1;
+			bool dynamically_allocated : 1;
 			void *vals;
 			size_t len, cap;
 		} Arr;
 	};
 } Value;
 
+void free_value(Value *v, bool purge);
 void print_value(const Value *v, bool raw);
 
 enum Operator {

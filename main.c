@@ -166,6 +166,7 @@ static Value fn_getln(Value *args) {
 		.type = TypeArr,
 		.Arr = {
 			.is_string = true,
+			.dynamically_allocated = true,
 			.type = TypeChar,
 			.vals = line,
 			.len = len,
@@ -219,11 +220,9 @@ int main(int argc, const char **argv) {
 	}
 	fclose(fp);
 	/* lex source file */
-	Pool *static_vars = pool_new(4096);
-	TokList tokens = lex(file, static_vars);
+	TokList tokens = lex(file);
 	if (err) {
 		toklist_term(&tokens);
-		pool_term(static_vars);
 		free(file);
 		fprintf(stderr, C_IRED "Lexer error" C_RESET " in " C_CYAN "%s" C_RESET ":%zu:%zu: %s\n", filename, err_ln, err_col, errbuf);
 		return 1;
@@ -248,7 +247,6 @@ int main(int argc, const char **argv) {
 	if (err) {
 		irlist_term(&ir);
 		toklist_term(&tokens);
-		pool_term(static_vars);
 		fprintf(stderr, C_IRED "Parser error" C_RESET " in " C_CYAN "%s" C_RESET ":%zu:%zu: %s\n", filename, err_ln, err_col, errbuf);
 		return 1;
 	}
@@ -261,11 +259,9 @@ int main(int argc, const char **argv) {
 		run(&ir, funcs);
 		if (err) {
 			irlist_term(&ir);
-			pool_term(static_vars);
 			fprintf(stderr, C_IRED "Runtime error" C_RESET " in " C_CYAN "%s" C_RESET ":%zu:%zu: %s\n", filename, err_ln, err_col, errbuf);
 			return 1;
 		}
 	}
 	irlist_term(&ir);
-	pool_term(static_vars);
 }

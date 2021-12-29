@@ -3,6 +3,6 @@
 
 #include "tok.h"
 
-TokList lex(const char *s, Pool *static_vars);
+TokList lex(const char *s);
 
 #endif /* LEX_H */

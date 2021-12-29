@@ -25,6 +25,22 @@ const char *type_str[TypeEnumSize] = {
 	[TypeArr]   = "arr",
 };
 
+/* if purge is set, even statically allocated literals will be freed */
+void free_value(Value *v, bool purge) {
+	switch (v->type) {
+		case TypeArr:
+			if (v->Arr.vals && (purge || v->Arr.dynamically_allocated)) {
+				free(v->Arr.vals);
+				v->Arr.vals = NULL;
+				v->Arr.len = 0;
+				v->Arr.cap = 0;
+			}
+			break;
+		default:
+			break;
+	}
+}
+
 void print_value(const Value *v, bool raw) {
 	switch (v->type) {
 		case TypeVoid:

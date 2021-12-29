@@ -58,7 +58,7 @@ static char get_esc_char(char c) {
 	}
 }
 
-TokList lex(const char *s, Pool *static_vars) {
+TokList lex(const char *s) {
 	TokList toks;
 	toklist_init(&toks);
 	Pos pos = { .ln = 1, .col = 1 };
@@ -329,7 +329,7 @@ TokList lex(const char *s, Pool *static_vars) {
 				/* go through the actual string */
 				s = start;
 				pos = start_pos;
-				char *str = pool_alloc(static_vars, type_size[TypeChar] * size);
+				char *str = xmalloc(size);
 				for (size_t i = 0; i < size; i++) {
 					char c = s[0];
 					if (c == '\\') {
@@ -347,6 +347,7 @@ TokList lex(const char *s, Pool *static_vars) {
 						.type = TypeArr,
 						.Arr = {
 							.is_string = true,
+							.dynamically_allocated = false,
 							.type = TypeChar,
 							.vals = str,
 							.len = size,

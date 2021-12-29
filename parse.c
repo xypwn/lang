@@ -5,8 +5,6 @@
 #include "map.h"
 #include "runtime.h"
 
-static BuiltinFunc *bf;
-
 typedef struct Scope {
 	struct Scope *parent;
 	size_t mem_addr;
@@ -750,8 +748,6 @@ static void stmt(IRList *out_ir, TokList *toks, Map *funcs, Scope *sc, TokListIt
 }
 
 IRList parse(TokList *toks, BuiltinFunc *builtin_funcs, size_t n_builtin_funcs) {
-	bf = builtin_funcs;
-
 	Map funcs;
 	map_init(&funcs, sizeof(BuiltinFunc));
 	for (size_t i = 0; i < n_builtin_funcs; i++) {

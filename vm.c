@@ -3,33 +3,50 @@
 #include "runtime.h"
 #include "util.h"
 
-#define INIT_STACK_CAP 256
+#define INIT_STACK_CAP 128
 
 typedef struct Stack {
 	Value *mem;
+	bool *holds_value;
 	size_t len, cap;
 } Stack;
 
 static Stack stack_make(void);
 static void stack_term(Stack *s);
 static void stack_fit(Stack *s, size_t idx);
+static void stack_assign(Stack *s, size_t idx, const Value *v);
 
 static Stack stack_make(void) {
 	Stack s;
 	s.mem = xmalloc(sizeof(Value) * INIT_STACK_CAP);
+	s.holds_value = xmalloc(sizeof(bool) * INIT_STACK_CAP);
 	s.cap = INIT_STACK_CAP;
 	s.len = 0;
+	for (size_t i = 0; i < s.cap; i++)
+		s.holds_value[i] = false;
 	return s;
 }
 
 static void stack_term(Stack *s) {
+	/* free any dynamically allocated objects still alive */
+	for (size_t i = 0; i < s->cap; i++) {
+		if (s->holds_value[i])
+			free_value(&s->mem[i], false);
+	}
+	/* free the stack memory itself */
 	free(s->mem);
+	free(s->holds_value);
 }
 
 static void stack_fit(Stack *s, size_t idx) {
 	size_t size = idx+1;
 	if (size > s->cap) {
-		s->mem = xrealloc(s->mem, sizeof(Value) * (size + (s->cap *= 2)));
+		size_t new_cap = size + s->cap * 2;
+		s->mem = xrealloc(s->mem, sizeof(Value) * new_cap);
+		s->holds_value = xrealloc(s->holds_value, sizeof(bool) * new_cap);
+		for (size_t i = s->cap; i < new_cap; i++)
+			s->holds_value[i] = false;
+		s->cap = new_cap;
 	}
 }
 
@@ -40,6 +57,14 @@ static Value *irparam_to_val(Stack *s, IRParam *v) {
 		return &s->mem[v->Addr];
 	else
 		ASSERT_UNREACHED();
+}
+
+static void stack_assign(Stack *s, size_t idx, const Value *v) {
+	stack_fit(s, idx);
+	if (s->holds_value[idx])
+		free_value(&s->mem[idx], false); /* free any overwritten heap-allocated values */
+	s->mem[idx] = *v;
+	s->holds_value[idx] = true;
 }
 
 void run(IRList *ir, const BuiltinFunc *builtin_funcs) {
@@ -58,25 +83,29 @@ void run(IRList *ir, const BuiltinFunc *builtin_funcs) {
 		switch (instr->instr) {
 			case IRSet:
 			case IRNeg:
-			case IRNot:
-				stack_fit(&s, instr->Unary.addr);
-				TRY_ELSE(s.mem[instr->Unary.addr] = eval_unary(instr->instr, irparam_to_val(&s, &instr->Unary.val)),
+			case IRNot: {
+				Value res;
+				TRY_ELSE(res = eval_unary(instr->instr, irparam_to_val(&s, &instr->Unary.val)),
 					{free(fn_args); stack_term(&s);});
+				stack_assign(&s, instr->Unary.addr, &res);
 				break;
-			case IRAddrOf:
+			}
+			case IRAddrOf: {
 				if (instr->Unary.val.kind != IRParamAddr) {
 					set_err("Unable to take the address of a literal");
 					return;
 				}
 				Value *v = &s.mem[instr->Unary.val.Addr];
-				s.mem[instr->Unary.addr] = (Value){
+				Value res = {
 					.type = TypePtr,
 					.Ptr = {
 						.type = v->type,
 						.val = &v->Void,
 					},
 				};
+				stack_assign(&s, instr->Unary.addr, &res);
 				break;
+			}
 			case IRAdd:
 			case IRSub:
 			case IRDiv:
@@ -86,19 +115,27 @@ void run(IRList *ir, const BuiltinFunc *builtin_funcs) {
 			case IRLt:
 			case IRLe:
 			case IRAnd:
-			case IROr:
-				stack_fit(&s, instr->Binary.addr);
-				TRY_ELSE(s.mem[instr->Binary.addr] = eval_binary(instr->instr,
+			case IROr: {
+				Value res;
+				TRY_ELSE(res = eval_binary(instr->instr,
 					irparam_to_val(&s, &instr->Binary.lhs),
 					irparam_to_val(&s, &instr->Binary.rhs)),
 					{free(fn_args); stack_term(&s);});
+				stack_assign(&s, instr->Binary.addr, &res);
 				break;
+			}
 			case IRJmp:
-				i = ir->index[instr->Jmp.iaddr];
+				if (instr->Jmp.iaddr < ir->len)
+					i = ir->index[instr->Jmp.iaddr];
+				else
+					i = NULL;
 				continue;
 			case IRJnz:
 				if (is_nonzero(irparam_to_val(&s, &instr->CJmp.condition))) {
-					i = ir->index[instr->Jmp.iaddr];
+					if (instr->Jmp.iaddr < ir->len)
+						i = ir->index[instr->CJmp.iaddr];
+					else
+						i = NULL;
 					continue;
 				}
 				break;
@@ -113,16 +150,17 @@ void run(IRList *ir, const BuiltinFunc *builtin_funcs) {
 					fn_args[i] = *irparam_to_val(&s, &instr->CallI.args[i]);
 
 				if (f->returns) {
-					stack_fit(&s, instr->CallI.ret_addr);
+					Value res;
 					if (f->kind == FuncVarArgs) {
 						size_t min_args = f->VarArgs.min_args;
-						TRY_ELSE(s.mem[instr->CallI.ret_addr] = f->VarArgs.WithRet.func(n_args - min_args, fn_args),
+						TRY_ELSE(res = f->VarArgs.WithRet.func(n_args - min_args, fn_args),
 							{free(fn_args); stack_term(&s);});
 					} else if (f->kind == FuncFixedArgs) {
-						TRY_ELSE(s.mem[instr->CallI.ret_addr] = f->FixedArgs.WithRet.func(fn_args),
+						TRY_ELSE(res = f->FixedArgs.WithRet.func(fn_args),
 							{free(fn_args); stack_term(&s);});
 					} else
 						ASSERT_UNREACHED();
+					stack_assign(&s, instr->CallI.ret_addr, &res);
 				} else {
 					if (f->kind == FuncVarArgs) {
 						size_t min_args = f->VarArgs.min_args;

@@ -4,23 +4,23 @@
 #include <stdlib.h>
 
 const char *irinstr_str[IRInstrEnumSize] = {
-	[IRSet] = "set",
-	[IRNeg] = "neg",
-	[IRAdd] = "add",
-	[IRSub] = "sub",
-	[IRMul] = "mul",
-	[IRDiv] = "div",
-	[IREq]  = "eq",
-	[IRNeq] = "neq",
-	[IRLt]  = "lt",
-	[IRLe]  = "le",
-	[IRNot] = "not",
-	[IRAnd] = "and",
-	[IROr]  = "or",
-	[IRJmp] = "jmp",
-	[IRJnz] = "jnz",
+	[IRSet]          = "set",
+	[IRNeg]          = "neg",
+	[IRAdd]          = "add",
+	[IRSub]          = "sub",
+	[IRMul]          = "mul",
+	[IRDiv]          = "div",
+	[IREq]           = "eq",
+	[IRNeq]          = "neq",
+	[IRLt]           = "lt",
+	[IRLe]           = "le",
+	[IRNot]          = "not",
+	[IRAnd]          = "and",
+	[IROr]           = "or",
+	[IRJmp]          = "jmp",
+	[IRJnz]          = "jnz",
 	[IRCallInternal] = "calli",
-	[IRAddrOf] = "addrof",
+	[IRAddrOf]       = "addrof",
 };
 
 #define IRLIST_INIT_CAP_LONG 4096
@@ -51,10 +51,51 @@ void irlist_init_short(IRList *v) {
 	irlist_init_with_cap(v, IRLIST_INIT_CAP_SHORT);
 }
 
+static void free_irparam(IRParam *v, bool purge);
+
+/* if purge is set, even statically allocated literals are freed */
+static void free_irparam(IRParam *v, bool purge) {
+	if (v->kind == IRParamLiteral)
+		free_value(&v->Literal, purge);
+}
+
 void irlist_term(IRList *v) {
 	for (IRItem *i = v->begin; i; i = i->next) {
-		if (i->tok.instr == IRCallInternal && i->tok.CallI.args)
-			free(i->tok.CallI.args);
+		switch (i->tok.instr) {
+			case IRSet:
+			case IRNeg:
+			case IRNot:
+			case IRAddrOf:
+				free_irparam(&i->tok.Unary.val, true);
+				break;
+			case IRAdd:
+			case IRSub:
+			case IRDiv:
+			case IRMul:
+			case IREq:
+			case IRNeq:
+			case IRLt:
+			case IRLe:
+			case IRAnd:
+			case IROr:
+				free_irparam(&i->tok.Binary.lhs, true);
+				free_irparam(&i->tok.Binary.rhs, true);
+				break;
+			case IRJmp:
+				break;
+			case IRJnz:
+				free_irparam(&i->tok.CJmp.condition, true);
+				break;
+			case IRCallInternal: {
+				size_t n_args = i->tok.CallI.n_args;
+				for (size_t j = 0; j < n_args; j++)
+					free_irparam(&i->tok.CallI.args[j], true);
+				free(i->tok.CallI.args);
+				break;
+			}
+			default:
+				ASSERT_UNREACHED();
+		}
 	}
 	pool_term(v->p);
 }
@@ -94,7 +135,7 @@ void irlist_eat_irlist(IRList *v, IRList *other) {
 void irlist_update_index(IRList *v) {
 	if (v->index)
 		return;
-	v->index = pool_alloc(v->p, v->len);
+	v->index = pool_alloc(v->p, sizeof(size_t) * v->len);
 	size_t num_idx = 0;
 	for (IRItem *i = v->begin; i; i = i->next, num_idx++)
 		v->index[num_idx] = i;
