@@ -23,55 +23,81 @@ const char *irinstr_str[IRInstrEnumSize] = {
 	[IRAddrOf] = "addrof",
 };
 
-#define IRTOKS_INIT_CAP_LONG 4096
-#define IRTOKS_INIT_CAP_SHORT 16
+#define IRLIST_INIT_CAP_LONG 4096
+#define IRLIST_INIT_CAP_SHORT 16
 
-static void irtoks_init_with_cap(IRToks *v, size_t cap);
+static void irlist_init_with_cap(IRList *v, size_t cap);
+static IRItem *irlist_new_item(IRList *v);
 
-static void irtoks_init_with_cap(IRToks *v, size_t cap) {
-	v->toks = xmalloc(sizeof(IRTok) * cap);
+static void irlist_init_with_cap(IRList *v, size_t cap) {
+	v->begin = NULL;
+	v->end = NULL;
+	v->p = pool_new(sizeof(IRItem) * cap);
+	v->index = NULL;
 	v->len = 0;
-	v->cap = cap;
 }
 
-void irtoks_init_long(IRToks *v) {
-	irtoks_init_with_cap(v, IRTOKS_INIT_CAP_LONG);
-
+static IRItem *irlist_new_item(IRList *v) {
+	IRItem *ret = pool_alloc(v->p, sizeof(IRItem));
+	ret->next = NULL;
+	return ret;
 }
 
-void irtoks_init_short(IRToks *v) {
-	irtoks_init_with_cap(v, IRTOKS_INIT_CAP_SHORT);
+void irlist_init_long(IRList *v) {
+	irlist_init_with_cap(v, IRLIST_INIT_CAP_LONG);
 }
 
-void irtoks_term(IRToks *v) {
-	for (size_t i = 0; i < v->len; i++) {
-		if (v->toks[i].instr == IRCallInternal && v->toks[i].CallI.args)
-			free(v->toks[i].CallI.args);
+void irlist_init_short(IRList *v) {
+	irlist_init_with_cap(v, IRLIST_INIT_CAP_SHORT);
+}
+
+void irlist_term(IRList *v) {
+	for (IRItem *i = v->begin; i; i = i->next) {
+		if (i->tok.instr == IRCallInternal && i->tok.CallI.args)
+			free(i->tok.CallI.args);
 	}
-	free(v->toks);
+	pool_term(v->p);
 }
 
-void irtoks_app(IRToks *v, IRTok t) {
-	if (v->len+1 > v->cap)
-		v->toks = xrealloc(v->toks, sizeof(IRTok) * (v->cap *= 2));
-	v->toks[v->len++] = t;
+void irlist_app(IRList *v, IRTok t) {
+	v->index = NULL; /* invalidate index */
+	IRItem *itm = irlist_new_item(v);
+	itm->tok = t;
+
+	if (!v->begin && !v->end)
+		v->begin = v->end = itm;
+	else {
+		v->end->next = itm;
+		v->end = itm;
+	}
+
+	v->len++;
 }
 
-void irtoks_eat_irtoks(IRToks *v, IRToks *other, size_t jmp_offset) {
-	if (v->len+other->len > v->cap)
-		v->toks = xrealloc(v->toks, sizeof(IRTok) * (other->len + (v->cap *= 2)));
-	for (size_t i = 0; i < other->len; i++) {
+void irlist_eat_irlist(IRList *v, IRList *other) {
+	v->index = NULL; /* invalidate index */
+	size_t jmp_offset = v->len-1;
+	for (IRItem *i = other->begin; i; i = i->next) {
 		/* correct for changed jump addresses */
-		if (other->toks[i].instr == IRJmp)
-			other->toks[i].Jmp.iaddr += jmp_offset;
-		else if (other->toks[i].instr == IRJnz)
-			other->toks[i].CJmp.iaddr += jmp_offset;
+		if (i->tok.instr == IRJmp)
+			i->tok.Jmp.iaddr += jmp_offset;
+		else if (i->tok.instr == IRJnz)
+			i->tok.CJmp.iaddr += jmp_offset;
 
-		v->toks[v->len++] = other->toks[i];
+		irlist_app(v, i->tok);
 	}
-	/* We're not calling irtoks_term() because we don't want associated items
+	/* We're not calling irlist_term() because we don't want associated items
 	 * (for example function arguments) to get deallocated as well. */
-	free(other->toks);
+	pool_term(other->p);
+}
+
+void irlist_update_index(IRList *v) {
+	if (v->index)
+		return;
+	v->index = pool_alloc(v->p, v->len);
+	size_t num_idx = 0;
+	for (IRItem *i = v->begin; i; i = i->next, num_idx++)
+		v->index[num_idx] = i;
 }
 
 static void print_irparam(const IRParam *p);
@@ -84,17 +110,18 @@ static void print_irparam(const IRParam *p) {
 	}
 }
 
-void print_ir(IRToks *v, const BuiltinFunc *builtin_funcs) {
-	for (size_t i = 0; i < v->len; i++) {
-		printf("%04zx ", i);
-		printf("%s", irinstr_str[v->toks[i].instr]);
-		switch (v->toks[i].instr) {
+void print_ir(IRList *v, const BuiltinFunc *builtin_funcs) {
+	size_t iaddr = 0;
+	for (IRItem *i = v->begin; i; i = i->next, iaddr++) {
+		printf("%04zx ", iaddr);
+		printf("%s", irinstr_str[i->tok.instr]);
+		switch (i->tok.instr) {
 			case IRSet:
 			case IRNeg:
 			case IRNot:
 			case IRAddrOf:
-				printf(" %%%zx ", v->toks[i].Unary.addr);
-				print_irparam(&v->toks[i].Unary.val);
+				printf(" %%%zx ", i->tok.Unary.addr);
+				print_irparam(&i->tok.Unary.val);
 				break;
 			case IRAdd:
 			case IRSub:
@@ -106,46 +133,47 @@ void print_ir(IRToks *v, const BuiltinFunc *builtin_funcs) {
 			case IRLe:
 			case IRAnd:
 			case IROr:
-				printf(" %%%zx ", v->toks[i].Binary.addr);
-				print_irparam(&v->toks[i].Binary.lhs);
+				printf(" %%%zx ", i->tok.Binary.addr);
+				print_irparam(&i->tok.Binary.lhs);
 				printf(" ");
-				print_irparam(&v->toks[i].Binary.rhs);
+				print_irparam(&i->tok.Binary.rhs);
 				break;
 			case IRJmp:
-				printf(" %zx", v->toks[i].Jmp.iaddr);
+				printf(" %zx", i->tok.Jmp.iaddr);
 				break;
 			case IRJnz:
 				printf(" ");
-				print_irparam(&v->toks[i].CJmp.condition);
-				printf(" %zx", v->toks[i].CJmp.iaddr);
+				print_irparam(&i->tok.CJmp.condition);
+				printf(" %zx", i->tok.CJmp.iaddr);
 				break;
 			case IRCallInternal: {
-				const BuiltinFunc *f = &builtin_funcs[v->toks[i].CallI.fid];
+				const BuiltinFunc *f = &builtin_funcs[i->tok.CallI.fid];
 				if (f->returns)
-					printf(" %%%zx", v->toks[i].CallI.ret_addr);
+					printf(" %%%zx", i->tok.CallI.ret_addr);
 				printf(" %s", f->name);
-				for (size_t j = 0; j < v->toks[i].CallI.n_args; j++) {
+				for (size_t j = 0; j < i->tok.CallI.n_args; j++) {
 					printf(" ");
-					print_irparam(&v->toks[i].CallI.args[j]);
+					print_irparam(&i->tok.CallI.args[j]);
 				}
 				break;
 			}
 			default: ASSERT_UNREACHED();
 		}
-		printf(" ; %zu:%zu", v->toks[i].ln, v->toks[i].col);
+		printf(" ; %zu:%zu", i->tok.ln, i->tok.col);
 		printf("\n");
 	}
 }
 
-void optimize_ir(IRToks *v) {
-	for (size_t i = 0; i < v->len; i++) {
-		switch (v->toks[i].instr) {
+void optimize_ir(IRList *v) {
+	irlist_update_index(v);
+	for (IRItem *i = v->begin; i; i = i->next) {
+		switch (i->tok.instr) {
 			case IRJmp: {
 				/* resolve jump chains (esp. produced by if-else-if... statements) */
-				size_t ja = i;
-				while (ja < v->len && v->toks[ja].instr == IRJmp)
-					ja = v->toks[ja].Jmp.iaddr;
-				v->toks[i].Jmp.iaddr = ja;
+				size_t ja = i->tok.Jmp.iaddr;
+				while (ja < v->len && v->index[ja]->tok.instr == IRJmp)
+					ja = v->index[ja]->tok.Jmp.iaddr;
+				i->tok.Jmp.iaddr = ja;
 			}
 			default: break;
 		}

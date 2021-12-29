@@ -109,19 +109,27 @@ typedef struct IRTok {
 	};
 } IRTok;
 
-typedef struct IRToks {
-	size_t len, cap;
-	IRTok *toks;
-} IRToks;
+typedef struct IRItem {
+	struct IRItem *next;
+	IRTok tok;
+} IRItem;
 
-void irtoks_init_long(IRToks *v);
-void irtoks_init_short(IRToks *v);
-void irtoks_term(IRToks *v);
-void irtoks_app(IRToks *v, IRTok t);
-void irtoks_eat_irtoks(IRToks *v, IRToks *other, size_t jmp_offset);
+typedef struct IRList {
+	IRItem *begin, *end;
+	Pool *p;
+	IRItem **index; /* index to pointer, irlist_update_index() must be called before use */
+	size_t len;
+} IRList;
 
-void print_ir(IRToks *v, const BuiltinFunc *builtin_funcs);
+void irlist_init_long(IRList *v);
+void irlist_init_short(IRList *v);
+void irlist_term(IRList *v);
+void irlist_app(IRList *v, IRTok t);
+void irlist_eat_irlist(IRList *v, IRList *other);
+void irlist_update_index(IRList *v); /* should be used very conservatively */
 
-void optimize_ir(IRToks *v);
+void print_ir(IRList *v, const BuiltinFunc *builtin_funcs);
+
+void optimize_ir(IRList *v);
 
 #endif /* IR_H */

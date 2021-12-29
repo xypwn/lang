@@ -3,6 +3,6 @@
 
 #include "ir.h"
 
-void run(const IRToks *ir, const BuiltinFunc *builtin_funcs);
+void run(IRList *ir, const BuiltinFunc *builtin_funcs);
 
 #endif /* VM_H */

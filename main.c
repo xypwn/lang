@@ -244,9 +244,9 @@ int main(int argc, const char **argv) {
 		{ .name = "sleep", .kind = FuncFixedArgs, .returns = false, .side_effects = true,  .FixedArgs = { .n_args = 1,   .NoRet.func   = fn_sleep, }},
 		{ .name = "getln", .kind = FuncFixedArgs, .returns = true,  .side_effects = true,  .FixedArgs = { .n_args = 0,   .WithRet.func = fn_getln, }},
 	};
-	IRToks ir = parse(&tokens, funcs, sizeof(funcs) / sizeof(funcs[0]));
+	IRList ir = parse(&tokens, funcs, sizeof(funcs) / sizeof(funcs[0]));
 	if (err) {
-		irtoks_term(&ir);
+		irlist_term(&ir);
 		toklist_term(&tokens);
 		pool_term(static_vars);
 		fprintf(stderr, C_IRED "Parser error" C_RESET " in " C_CYAN "%s" C_RESET ":%zu:%zu: %s\n", filename, err_ln, err_col, errbuf);
@@ -260,12 +260,12 @@ int main(int argc, const char **argv) {
 	if (!opt_dry) {
 		run(&ir, funcs);
 		if (err) {
-			irtoks_term(&ir);
+			irlist_term(&ir);
 			pool_term(static_vars);
 			fprintf(stderr, C_IRED "Runtime error" C_RESET " in " C_CYAN "%s" C_RESET ":%zu:%zu: %s\n", filename, err_ln, err_col, errbuf);
 			return 1;
 		}
 	}
-	irtoks_term(&ir);
+	irlist_term(&ir);
 	pool_term(static_vars);
 }

@@ -42,14 +42,17 @@ static Value *irparam_to_val(Stack *s, IRParam *v) {
 		ASSERT_UNREACHED();
 }
 
-void run(const IRToks *ir, const BuiltinFunc *builtin_funcs) {
+void run(IRList *ir, const BuiltinFunc *builtin_funcs) {
 	/* so we don't have to call malloc on every function call */
 	size_t fn_args_cap = 16;
 	Value *fn_args = xmalloc(sizeof(Value) * fn_args_cap);
 
+	/* so we can use index-based addressing */
+	irlist_update_index(ir);
+
 	Stack s = stack_make();
-	for (size_t i = 0; i < ir->len;) {
-		IRTok *instr = &ir->toks[i];
+	for (IRItem *i = ir->begin; i;) {
+		IRTok *instr = &i->tok;
 		err_ln = instr->ln;
 		err_col = instr->col;
 		switch (instr->instr) {
@@ -91,11 +94,11 @@ void run(const IRToks *ir, const BuiltinFunc *builtin_funcs) {
 					{free(fn_args); stack_term(&s);});
 				break;
 			case IRJmp:
-				i = instr->Jmp.iaddr;
+				i = ir->index[instr->Jmp.iaddr];
 				continue;
 			case IRJnz:
 				if (is_nonzero(irparam_to_val(&s, &instr->CJmp.condition))) {
-					i = instr->Jmp.iaddr;
+					i = ir->index[instr->Jmp.iaddr];
 					continue;
 				}
 				break;
@@ -137,7 +140,7 @@ void run(const IRToks *ir, const BuiltinFunc *builtin_funcs) {
 				ASSERT_UNREACHED();
 		}
 
-		i++;
+		i = i->next;
 	}
 	stack_term(&s);
 	free(fn_args);

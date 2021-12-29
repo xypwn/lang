@@ -5,6 +5,6 @@
 #include "tok.h"
 #include "util.h"
 
-IRToks parse(TokList *toks, BuiltinFunc *builtin_funcs, size_t n_builtin_funcs);
+IRList parse(TokList *toks, BuiltinFunc *builtin_funcs, size_t n_builtin_funcs);
 
 #endif /* PARSE_H */
