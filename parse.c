@@ -31,6 +31,7 @@ static IRParam tok_to_irparam(Scope *sc, Tok *t);
 static Scope make_scope(Scope *parent, bool with_idents);
 static void term_scope(Scope *sc);
 static bool expr_flush_ir_and_maybe_return(IRList *out_ir, TokList *toks, IRTok instr, TokListItem *expr_start, Scope *expr_scope, TokListItem *t, ExprRet *out_ret);
+static void make_value_statically_allocated(Value *v);
 static ExprRet expr(IRList *out_ir, TokList *toks, Map *funcs, Scope *parent_sc, TokListItem *t);
 static void expr_into_addr(IRList *out_ir, TokList *toks, Map *funcs, Scope *parent_sc, TokListItem *t, size_t addr);
 static IRParam expr_into_irparam(IRList *out_ir, TokList *toks, Map *funcs, Scope *parent_sc, TokListItem *t);
@@ -157,6 +158,13 @@ static bool expr_flush_ir_and_maybe_return(IRList *out_ir, TokList *toks, IRTok 
 			},
 		};
 		return false;
+	}
+}
+
+static void make_value_statically_allocated(Value *v) {
+	switch (v->type) {
+		case TypeArr: v->Arr.dynamically_allocated = false; break;
+		default: break;
 	}
 }
 
@@ -355,6 +363,12 @@ static ExprRet expr(IRList *out_ir, TokList *toks, Map *funcs, Scope *parent_sc,
 						func.VarArgs.WithRet.func(args_len - func.VarArgs.min_args, arg_vals)
 						: func.FixedArgs.WithRet.func(arg_vals),
 				};
+				/* since we have a literal return value, we want it to be fully treated like one by the memory manager */
+				make_value_statically_allocated(&func_ident->tok.Val);
+				/* immediately free any heap-allocated literals that are no longer needed */
+				for (size_t i = 0; i < args_len; i++)
+					free_value(&arg_vals[i], true);
+				/* free buffers */
 				if (arg_vals)
 					free(arg_vals);
 				if (args)

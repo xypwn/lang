@@ -127,6 +127,40 @@ static Value fn_ptr(Value *args) {
 	return (Value){ .type = TypePtr, .Ptr = { .type = TypeVoid, .val = NULL }};
 }
 
+static Value fn_string(Value *args) {
+	char *res = xmalloc(64);
+	size_t len;
+
+	switch (args[0].type) {
+		case TypeVoid:  strcpy(res, "(void)"); len = 6;               break;
+		case TypeFloat: len = snprintf(res, 64, "%f", args[0].Float); break;
+		case TypeInt:   len = snprintf(res, 64, "%zd", args[0].Int);  break;
+		case TypeBool:
+			if (args[0].Bool) {
+				strcpy(res, "true");
+				len = 4;
+			} else {
+				strcpy(res, "false");
+				len = 5;
+			}
+			break;
+		case TypeChar:  res[0] = args[0].Char; len = 1;               break;
+		default: ASSERT_UNREACHED();
+	}
+
+	return (Value){
+		.type = TypeArr,
+		.Arr = {
+			.is_string = true,
+			.dynamically_allocated = true,
+			.type = TypeChar,
+			.vals = res,
+			.len = len,
+			.cap = 64,
+		},
+	};
+}
+
 static Value fn_pow(Value *args) {
 	if (!(args[0].type == TypeFloat && args[1].type == TypeFloat)) {
 		set_err("pow() requires arguments of type float");
@@ -232,16 +266,17 @@ int main(int argc, const char **argv) {
 		print_toks(&tokens);
 	/* parse tokens into IR code */
 	BuiltinFunc funcs[] = {
-		{ .name = "put",   .kind = FuncVarArgs,   .returns = false, .side_effects = true,  .VarArgs   = { .min_args = 0, .NoRet.func   = fn_put,   }},
-		{ .name = "putln", .kind = FuncVarArgs,   .returns = false, .side_effects = true,  .VarArgs   = { .min_args = 0, .NoRet.func   = fn_putln, }},
-		{ .name = "int",   .kind = FuncFixedArgs, .returns = true,  .side_effects = false, .FixedArgs = { .n_args = 1,   .WithRet.func = fn_int,   }},
-		{ .name = "float", .kind = FuncFixedArgs, .returns = true,  .side_effects = false, .FixedArgs = { .n_args = 1,   .WithRet.func = fn_float, }},
-		{ .name = "bool",  .kind = FuncFixedArgs, .returns = true,  .side_effects = false, .FixedArgs = { .n_args = 1,   .WithRet.func = fn_bool,  }},
-		{ .name = "char",  .kind = FuncFixedArgs, .returns = true,  .side_effects = false, .FixedArgs = { .n_args = 1,   .WithRet.func = fn_char,  }},
-		{ .name = "ptr",   .kind = FuncFixedArgs, .returns = true,  .side_effects = false, .FixedArgs = { .n_args = 0,   .WithRet.func = fn_ptr,   }},
-		{ .name = "pow",   .kind = FuncFixedArgs, .returns = true,  .side_effects = false, .FixedArgs = { .n_args = 2,   .WithRet.func = fn_pow,   }},
-		{ .name = "sleep", .kind = FuncFixedArgs, .returns = false, .side_effects = true,  .FixedArgs = { .n_args = 1,   .NoRet.func   = fn_sleep, }},
-		{ .name = "getln", .kind = FuncFixedArgs, .returns = true,  .side_effects = true,  .FixedArgs = { .n_args = 0,   .WithRet.func = fn_getln, }},
+		{ .name = "put",    .kind = FuncVarArgs,   .returns = false, .side_effects = true,  .VarArgs   = { .min_args = 0, .NoRet.func   = fn_put,    }},
+		{ .name = "putln",  .kind = FuncVarArgs,   .returns = false, .side_effects = true,  .VarArgs   = { .min_args = 0, .NoRet.func   = fn_putln,  }},
+		{ .name = "int",    .kind = FuncFixedArgs, .returns = true,  .side_effects = false, .FixedArgs = { .n_args = 1,   .WithRet.func = fn_int,    }},
+		{ .name = "float",  .kind = FuncFixedArgs, .returns = true,  .side_effects = false, .FixedArgs = { .n_args = 1,   .WithRet.func = fn_float,  }},
+		{ .name = "bool",   .kind = FuncFixedArgs, .returns = true,  .side_effects = false, .FixedArgs = { .n_args = 1,   .WithRet.func = fn_bool,   }},
+		{ .name = "char",   .kind = FuncFixedArgs, .returns = true,  .side_effects = false, .FixedArgs = { .n_args = 1,   .WithRet.func = fn_char,   }},
+		{ .name = "ptr",    .kind = FuncFixedArgs, .returns = true,  .side_effects = false, .FixedArgs = { .n_args = 0,   .WithRet.func = fn_ptr,    }},
+		{ .name = "string", .kind = FuncFixedArgs, .returns = true,  .side_effects = false, .FixedArgs = { .n_args = 1,   .WithRet.func = fn_string, }},
+		{ .name = "pow",    .kind = FuncFixedArgs, .returns = true,  .side_effects = false, .FixedArgs = { .n_args = 2,   .WithRet.func = fn_pow,    }},
+		{ .name = "sleep",  .kind = FuncFixedArgs, .returns = false, .side_effects = true,  .FixedArgs = { .n_args = 1,   .NoRet.func   = fn_sleep,  }},
+		{ .name = "getln",  .kind = FuncFixedArgs, .returns = true,  .side_effects = true,  .FixedArgs = { .n_args = 0,   .WithRet.func = fn_getln,  }},
 	};
 	IRList ir = parse(&tokens, funcs, sizeof(funcs) / sizeof(funcs[0]));
 	if (err) {
