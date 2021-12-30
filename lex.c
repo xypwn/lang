@@ -339,6 +339,7 @@ TokList lex(const char *s) {
 						c = get_esc_char(s[0]);
 						if (!c) {
 							set_err("Unrecognized escape sequence: '\\%c'", c);
+							free(str);
 							return toks;
 						}
 					}

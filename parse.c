@@ -454,9 +454,9 @@ static ExprRet expr(IRList *out_ir, TokList *toks, Map *funcs, Scope *parent_sc,
 					for (size_t i = 0; i < elems_len; i++) {
 						Value *v = &elems[i].Literal;
 						if (v->type != arr_ty) {
+							set_err("Type of array item %zu (%s) differs from array type (%s)", i, type_str[v->type], type_str[arr_ty]);
 							free(arr_vals);
 							free(elems);
-							set_err("Type of array item %zu (%s) differs from array type (%s)", i, type_str[v->type], type_str[arr_ty]);
 							return (ExprRet){0};
 						}
 						memcpy((uint8_t*)arr_vals + type_size[arr_ty] * i, &v->Void, type_size[arr_ty]);
@@ -729,9 +729,9 @@ static void stmt(IRList *out_ir, TokList *toks, Map *funcs, Scope *sc, TokListIt
 			skip_newlns(toks, t->next);
 			if (t->next->tok.kind == TokOp) {
 				if (t->next->tok.Op == OpEOF) {
-					term_scope(&inner_sc);
 					mark_err(&start->tok);
 					set_err("Unclosed '{'");
+					term_scope(&inner_sc);
 					return;
 				}
 				if (t->next->tok.Op == OpRCurl)

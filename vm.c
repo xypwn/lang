@@ -92,9 +92,9 @@ void run(IRList *ir, const BuiltinFunc *builtin_funcs) {
 			}
 			case IRAddrOf: {
 				if (instr->Unary.val.kind != IRParamAddr) {
+					set_err("Unable to take the address of a literal");
 					free(fn_args);
 					stack_term(&s);
-					set_err("Unable to take the address of a literal");
 					return;
 				}
 				Value *v = &s.mem[instr->Unary.val.Addr];
@@ -195,10 +195,10 @@ void run(IRList *ir, const BuiltinFunc *builtin_funcs) {
 					for (size_t j = 0; j < arr_len; j++) {
 						Value *v = irparam_to_val(&s, &instr->ArrMake.vals[j]);
 						if (v->type != arr_ty) {
+							set_err("Type of array item %zu (%s) differs from array type (%s)", j, type_str[v->type], type_str[arr_ty]);
 							free(arr_vals);
 							free(fn_args);
 							stack_term(&s);
-							set_err("Type of array item %zu (%s) differs from array type (%s)", j, type_str[v->type], type_str[arr_ty]);
 							return;
 						}
 						memcpy((uint8_t*)arr_vals + type_size[arr_ty] * j, &v->Void, type_size[arr_ty]);
