@@ -247,6 +247,8 @@ TokList lex(const char *s) {
 			case '}':
 			case '(':
 			case ')':
+			case '[':
+			case ']':
 			case ',':
 			case '+':
 			case '-':

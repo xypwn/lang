@@ -66,6 +66,9 @@ static void set_irtok_dest_addr(IRTok *t, size_t addr) {
 		case IRCallInternal:
 			t->CallI.ret_addr = addr;
 			break;
+		case IRArrMake:
+			t->ArrMake.arr_addr = addr;
+			break;
 		default:
 			ASSERT_UNREACHED();
 	}
@@ -313,7 +316,7 @@ static ExprRet expr(IRList *out_ir, TokList *toks, Map *funcs, Scope *parent_sc,
 						eval_func_in_place = false;
 					if (t->next->tok.kind == TokOp) {
 						if (t->next->tok.Op == OpComma) {
-							toklist_del(toks, t->next, t->next); /* delete right parenthesis */
+							toklist_del(toks, t->next, t->next); /* delete comma */
 							continue;
 						} else if (t->next->tok.Op == OpRParen) {
 							toklist_del(toks, t->next, t->next); /* delete right parenthesis */
@@ -390,6 +393,99 @@ static ExprRet expr(IRList *out_ir, TokList *toks, Map *funcs, Scope *parent_sc,
 				/* return if we've just evaluated the last instruction */
 				ExprRet ret;
 				if (expr_flush_ir_and_maybe_return(out_ir, toks, ir_tok, start, &sc, func_ident, &ret))
+					return ret;
+			}
+		}
+
+		/* Collapse array. */
+		else if (t->tok.kind == TokOp && t->tok.Op == OpLBrack) {
+			TokListItem *lbrack = t;
+			bool eval_immediately = true;
+			size_t elems_len = 0;
+			size_t elems_cap = 0;
+			IRParam *elems = NULL;
+
+			if (t->next->tok.kind == TokOp && t->next->tok.Op == OpRBrack) {
+				/* empty array */
+				toklist_del(toks, t->next, t->next); /* delete right bracket */
+			} else {
+				elems_cap = 16;
+				elems = xmalloc(sizeof(IRParam) * elems_cap);
+				for (;;) {
+					if (elems_len+1 > elems_cap)
+						elems = xrealloc(elems, (elems_cap *= 2));
+					IRParam e;
+					TRY_RET_ELSE(e = expr_into_irparam(out_ir, toks, funcs, &sc, t->next), (ExprRet){0}, free(elems));
+					if (e.kind != IRParamLiteral)
+						eval_immediately = false;
+					elems[elems_len++] = e;
+					if (t->next->tok.kind == TokOp) {
+						if (t->next->tok.Op == OpComma) {
+							toklist_del(toks, t->next, t->next); /* delete comma */
+							continue;
+						} else if (t->next->tok.Op == OpRBrack) {
+							toklist_del(toks, t->next, t->next); /* delete right bracket */
+							break;
+						}
+					}
+					mark_err(&t->next->tok);
+					set_err("Expected ',' or ']' after array element");
+					free(elems);
+					return (ExprRet){0};
+				}
+			}
+
+			if (eval_immediately) {
+				/* turn array into value */
+				Value arr = {
+					.type = TypeArr,
+					.Arr = {
+						.type = TypeVoid,
+						.is_string = false,
+						.dynamically_allocated = false,
+						.vals = NULL,
+						.len = elems_len,
+						.cap = elems_len ? elems_cap : 0,
+					},
+				};
+				if (elems_len) {
+					Type arr_ty = elems[0].Literal.type;
+					void *arr_vals = xmalloc(type_size[arr_ty] * elems_cap);
+					for (size_t i = 0; i < elems_len; i++) {
+						Value *v = &elems[i].Literal;
+						if (v->type != arr_ty) {
+							free(arr_vals);
+							free(elems);
+							set_err("Type of array item %zu (%s) differs from array type (%s)", i, type_str[v->type], type_str[arr_ty]);
+							return (ExprRet){0};
+						}
+						memcpy((uint8_t*)arr_vals + type_size[arr_ty] * i, &v->Void, type_size[arr_ty]);
+					}
+					arr.Arr.type = arr_ty;
+					arr.Arr.vals = arr_vals;
+				}
+				/* set lbracket to collapsed array value */
+				lbrack->tok.kind = TokVal;
+				lbrack->tok.Val = arr;
+				/* free the now no longer needed element IRParam values */
+				free(elems);
+			} else {
+				/* array initialization IR instruction */
+				IRTok ir_tok = {
+					.ln =  lbrack->tok.ln,
+					.col = lbrack->tok.col,
+					.instr = IRArrMake,
+					.ArrMake = {
+						.arr_addr = 0,
+						.len = elems_len,
+						.cap = elems_cap,
+						.vals = elems,
+					},
+				};
+
+				/* return if we've just evaluated the last instruction */
+				ExprRet ret;
+				if (expr_flush_ir_and_maybe_return(out_ir, toks, ir_tok, start, &sc, lbrack, &ret))
 					return ret;
 			}
 		}

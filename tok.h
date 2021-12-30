@@ -51,6 +51,8 @@ enum Operator {
 	OpRCurl  = '}',
 	OpLParen = '(',
 	OpRParen = ')',
+	OpLBrack = '[',
+	OpRBrack = ']',
 	OpComma  = ',',
 	OpAdd    = '+',
 	OpSub    = '-',

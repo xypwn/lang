@@ -51,6 +51,7 @@ enum IRInstr {
 	IRJnz,
 	IRCallInternal,
 	IRAddrOf,
+	IRArrMake,
 	IRInstrEnumSize,
 };
 typedef enum IRInstr IRInstr;
@@ -106,6 +107,12 @@ typedef struct IRTok {
 			size_t n_args;
 			IRParam *args;
 		} CallI;
+
+		struct {
+			size_t arr_addr;
+			size_t len, cap;
+			IRParam *vals;
+		} ArrMake;
 	};
 } IRTok;
 

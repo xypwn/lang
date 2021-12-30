@@ -21,6 +21,7 @@ const char *irinstr_str[IRInstrEnumSize] = {
 	[IRJnz]          = "jnz",
 	[IRCallInternal] = "calli",
 	[IRAddrOf]       = "addrof",
+	[IRArrMake]      = "mkarr",
 };
 
 #define IRLIST_INIT_CAP_LONG 4096
@@ -86,13 +87,16 @@ void irlist_term(IRList *v) {
 			case IRJnz:
 				free_irparam(&i->tok.CJmp.condition, true);
 				break;
-			case IRCallInternal: {
-				size_t n_args = i->tok.CallI.n_args;
-				for (size_t j = 0; j < n_args; j++)
+			case IRCallInternal:
+				for (size_t j = 0; j < i->tok.CallI.n_args; j++)
 					free_irparam(&i->tok.CallI.args[j], true);
 				free(i->tok.CallI.args);
 				break;
-			}
+			case IRArrMake:
+				for (size_t j = 0; j < i->tok.ArrMake.len; j++)
+					free_irparam(&i->tok.ArrMake.vals[j], true);
+				free(i->tok.ArrMake.vals);
+				break;
 			default:
 				ASSERT_UNREACHED();
 		}
@@ -195,6 +199,14 @@ void print_ir(IRList *v, const BuiltinFunc *builtin_funcs) {
 				for (size_t j = 0; j < i->tok.CallI.n_args; j++) {
 					printf(" ");
 					print_irparam(&i->tok.CallI.args[j]);
+				}
+				break;
+			}
+			case IRArrMake: {
+				printf(" %%%zx", i->tok.ArrMake.arr_addr);
+				for (size_t j = 0; j < i->tok.ArrMake.len; j++) {
+					printf(" ");
+					print_irparam(&i->tok.ArrMake.vals[j]);
 				}
 				break;
 			}

@@ -92,6 +92,8 @@ void run(IRList *ir, const BuiltinFunc *builtin_funcs) {
 			}
 			case IRAddrOf: {
 				if (instr->Unary.val.kind != IRParamAddr) {
+					free(fn_args);
+					stack_term(&s);
 					set_err("Unable to take the address of a literal");
 					return;
 				}
@@ -172,6 +174,39 @@ void run(IRList *ir, const BuiltinFunc *builtin_funcs) {
 					} else
 						ASSERT_UNREACHED();
 				}
+				break;
+			}
+			case IRArrMake: {
+				size_t arr_len = instr->ArrMake.len, arr_cap = instr->ArrMake.cap;
+				Value arr = {
+					.type = TypeArr,
+					.Arr = {
+						.type = TypeVoid,
+						.is_string = false,
+						.dynamically_allocated = true,
+						.vals = NULL,
+						.len = arr_len,
+						.cap = arr_len ? arr_cap : 0,
+					},
+				};
+				if (arr_len) {
+					Type arr_ty = irparam_to_val(&s, &instr->ArrMake.vals[0])->type;
+					void *arr_vals = xmalloc(type_size[arr_ty] * arr_cap);
+					for (size_t j = 0; j < arr_len; j++) {
+						Value *v = irparam_to_val(&s, &instr->ArrMake.vals[j]);
+						if (v->type != arr_ty) {
+							free(arr_vals);
+							free(fn_args);
+							stack_term(&s);
+							set_err("Type of array item %zu (%s) differs from array type (%s)", j, type_str[v->type], type_str[arr_ty]);
+							return;
+						}
+						memcpy((uint8_t*)arr_vals + type_size[arr_ty] * j, &v->Void, type_size[arr_ty]);
+					}
+					arr.Arr.type = arr_ty;
+					arr.Arr.vals = arr_vals;
+				}
+				stack_assign(&s, instr->ArrMake.arr_addr, &arr);
 				break;
 			}
 			default:
